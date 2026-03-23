@@ -1,12 +1,9 @@
 ---
+description: Get CoorenLabs on your machine fast. Then inspect the API and route groups.
 icon: bolt
 ---
 
 # Quickstart
-
-## Quickstart
-
-Get Cooren on your machine fast. Then inspect the API and route groups.
 
 {% hint style="success" %}
 You should be ready to explore the API in a few minutes.

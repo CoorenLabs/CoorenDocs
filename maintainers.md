@@ -1,12 +1,9 @@
 ---
+description: The project is maintained by the people below.
 icon: users
 ---
 
 # Maintainers
-
-## Maintainers
-
-The project is maintained by the people below.
 
 ### Core maintainers
 
