@@ -17,6 +17,7 @@
 * [Manga](provider/manga/README.md)
   * [All Manga](provider/manga/all-manga.md)
   * [MangaBall](provider/manga/mangaball.md)
+  * [MangaFire](provider/manga/mangafire.md)
 * [Music](provider/music/README.md)
   * [Tidal](provider/music/tidal.md)
 * [Movie/TV](provider/movie-tv/README.md)
