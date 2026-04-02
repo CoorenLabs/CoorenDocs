@@ -67,5 +67,7 @@ See [MangaFire](mangafire.md) for the full route reference.
 
 1. Use AllManga for a simpler discovery-to-reader flow.
 2. Use MangaBall when you need stronger filters and author views.
-3. Render proxied image URLs from both providers in the reader.
-4. Mix both providers if you want broader catalog coverage.
+3. Use MangaFire when you need volume metadata and multi-language support.
+4. Render proxied image URLs from all providers in the reader.
+5. Mix providers if you want broader catalog coverage and metadata depth.
+
