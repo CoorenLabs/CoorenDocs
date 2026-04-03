@@ -20,11 +20,13 @@ Current providers:
 
 * `allmanga`
 * `mangaball`
+* `mangafire`
 
 Each provider covers a different reading and browsing style:
 
 * AllManga for curated discovery and generated chapter flows
 * MangaBall for deeper filters, tags, authors, and translated chapter variants
+* MangaFire for extensive language support, volume metadata, and high-quality covers
 
 ### Providers
 
@@ -50,9 +52,22 @@ MangaBall is a good fit when you need:
 
 See [MangaBall](mangaball.md) for the full route reference.
 
+#### MangaFire
+
+MangaFire is a good fit when you need:
+
+* multi-language chapter support
+* volume metadata and covers
+* curated trending and most-viewed sections
+* comprehensive metadata and similar manga recommendations
+
+See [MangaFire](mangafire.md) for the full route reference.
+
 ### Typical integration
 
 1. Use AllManga for a simpler discovery-to-reader flow.
 2. Use MangaBall when you need stronger filters and author views.
-3. Render proxied image URLs from both providers in the reader.
-4. Mix both providers if you want broader catalog coverage.
+3. Use MangaFire when you need volume metadata and multi-language support.
+4. Render proxied image URLs from all providers in the reader.
+5. Mix providers if you want broader catalog coverage and metadata depth.
+
