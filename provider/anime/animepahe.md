@@ -1,410 +1,311 @@
 ---
+description: Search AnimePahe, list episodes and get sub and dub HLS streams with download links.
 icon: bolt
 ---
 
 # AnimePahe
 
-## AnimePahe
-
-AnimePahe exposes search, latest airing, anime metadata, episode lists, and streaming links.
-
-Use it when you need strong search results, full episode lists, and multiple stream variants per episode.
+AnimePahe scrapes [animepahe.pw](https://animepahe.pw) for search, the latest releases, anime details, full episode lists and kwik streams. Each episode usually has Japanese audio and an English dub at 360p, 720p and 1080p, each with a direct HLS link, a proxied link and an MP4 download link. The site sits behind Cloudflare, so the API solves the challenge in a browser on the first request.
 
 {% hint style="info" %}
-Base route: `GET /anime/animepahe/...`
+Base route: `/anime/animepahe`
 {% endhint %}
 
-### Overview
+## Routes
 
-AnimePahe supports:
+| Route | Description |
+| --- | --- |
+| `GET /anime/animepahe` | Lists the provider's routes |
+| `GET /anime/animepahe/search/:query` | Search titles |
+| `GET /anime/animepahe/latest` | Latest released episodes |
+| `GET /anime/animepahe/info/:id` | Anime details |
+| `GET /anime/animepahe/episodes/:id` | Every episode of an anime |
+| `GET /anime/animepahe/episode/:id/:session` | Streams for one episode, as newline-delimited JSON |
 
-* Full-text search
-* Latest airing episodes
-* Anime metadata
-* Complete episode lists
-* Stream sources by episode
+AnimePahe uses two kinds of id:
 
-Provider routes:
+* `id` identifies an anime. It is the `id` (or `session`) from search results and the `id` from latest results.
+* `session` identifies an episode. It is the `session` from episode lists and latest results.
 
-* `GET /anime/animepahe/search/:query`
-* `GET /anime/animepahe/latest`
-* `GET /anime/animepahe/info/:id`
-* `GET /anime/animepahe/episodes/:id`
-* `GET /anime/animepahe/episode/:id/:session`
+Successful responses are the result object itself. Errors are `{ "error": "..." }`.
 
-### Common data shapes
+## Overview
 
-#### Search item
+### Provider index
 
-```ts
-interface AnimeSearchItem {
-  id: string;
-  title: string;
-  type: string;
-  episodes: number;
-  status: string;
-  year: number;
-  score: number;
-  poster: string;
-  session: string;
+`GET /anime/animepahe`
+
+Returns the provider name, a description and its routes.
+
+**Example**
+
+```bash
+curl "http://localhost:3000/anime/animepahe"
+```
+
+```json
+{
+  "name": "animepahe",
+  "description": "Anime provider backed by animepahe — search, info, episodes and kwik streams.",
+  "endpoints": [
+    "/anime/animepahe/search/:query",
+    "/anime/animepahe/latest",
+    "/anime/animepahe/info/:id",
+    "/anime/animepahe/episodes/:id",
+    "/anime/animepahe/episode/:id/:session"
+  ]
 }
 ```
 
-#### Latest airing item
+## Search
 
-```ts
-interface AiringItem {
-  id: string;
-  title: string;
-  episode: number;
-  snapshot: string;
-  session: string;
-  fansub: string;
-  created_at: string;
-}
-```
-
-#### Episode item
-
-```ts
-interface Episode {
-  title: string;
-  episode: number;
-  released: string;
-  snapshot: string;
-  duration: string;
-  filler: boolean;
-  session: string;
-}
-```
-
-#### Anime metadata
-
-```ts
-interface AnimeMeta {
-  id: string;
-  name: string;
-  description: string;
-  poster: string | null;
-  background: string | null;
-  aired: string;
-  duration: string;
-  genres: string[];
-  externalLinks: string[];
-}
-```
-
-#### Stream result
-
-```ts
-interface StreamResult {
-  id: string;
-  title: string;
-  url: string;
-  directUrl?: string | null;
-  quality: string;
-  audio: string;
-  type?: string;
-  downloadUrl?: string | null;
-  corsHeaders?: Record<string, string>;
-  animeName?: string;
-}
-```
-
-### Search
-
-#### Full-text search
+### Search titles
 
 `GET /anime/animepahe/search/:query`
 
-Searches AnimePahe and returns a curated result list.
+Returns up to 8 matching titles. `id` and `session` hold the same value, the anime id used by the other routes. A search with no matches returns `{ "results": [] }`.
 
-**Params**
+**Path parameters**
 
-* `query` required
+| Name | Required | Description |
+| --- | --- | --- |
+| `query` | Yes | Search text, URL-encoded |
 
-Example shape:
+**Example**
+
+```bash
+curl "http://localhost:3000/anime/animepahe/search/frieren"
+```
 
 ```json
 {
   "results": [
     {
-      "id": "xxxxx",
-      "title": "Title",
+      "id": "513a0085-6e0d-a1df-9c14-aeec15a286f7",
+      "title": "Frieren: Beyond Journey's End",
       "type": "TV",
-      "episodes": 24,
+      "episodes": 28,
       "status": "Finished Airing",
-      "year": 2015,
-      "score": 8.5,
-      "poster": "https://i.animepahe.si/posters/....jpg",
-      "session": "xxxxx"
+      "year": 2023,
+      "score": 9.25,
+      "poster": "https://i.animepahe.pw/uploads/posters/93a/93a7bacea37d530426ca2a4ff26a6ae40dd1d2d6feb9dfe4752e0bd0e0bca4e1.webp",
+      "session": "513a0085-6e0d-a1df-9c14-aeec15a286f7"
+    },
+    {
+      "id": "28890275-f126-0ca5-07f8-69471455d3bb",
+      "title": "Frieren: Beyond Journey's End Season 2",
+      "type": "TV",
+      "episodes": 10,
+      "status": "Finished Airing",
+      "year": 2026,
+      "score": 8.84,
+      "poster": "https://i.animepahe.pw/uploads/posters/d78/d78c3999383262d4f3297378f938b5acb9e3ae7e6c0ae6fbf67347ace49f5ee2.webp",
+      "session": "28890275-f126-0ca5-07f8-69471455d3bb"
     }
   ]
 }
 ```
 
-```bash
-curl "http://localhost:3000/anime/animepahe/search/one%20piece"
-```
+`episodes` is `0` for titles that are still airing, for example One Piece.
 
-**Notes**
-
-* Uses the AnimePahe API search endpoint internally.
-* Search is validated with a schema before transformation.
-* Validation failures return `results: []`.
-* Poster paths are normalized to absolute URLs.
-* `id` is set to the same value as `session`.
-
-Typical flow:
-
-1. Search by title.
-2. Pick an anime using `id`.
-3. Use that `id` for info and episode routes.
-
-### Latest airing
-
-#### Latest episodes feed
+### Latest episodes
 
 `GET /anime/animepahe/latest`
 
-Returns recently aired episodes.
+Returns the first page of AnimePahe's airing feed, newest first. Each item carries both ids the stream route needs: `id` is the anime and `session` is the episode.
 
-Example shape:
+**Example**
+
+```bash
+curl "http://localhost:3000/anime/animepahe/latest"
+```
 
 ```json
 {
   "results": [
     {
-      "id": "anime-session-id",
-      "title": "Anime Title",
-      "episode": 5,
-      "snapshot": "https://i.animepahe.si/screenshots/...jpg",
-      "session": "episode-session-id",
+      "id": "e284995c-d4d8-426b-7049-310897f592b9",
+      "title": "I Want to Love You Till Your Dying Day",
+      "episode": 13,
+      "snapshot": "https://i.animepahe.pw/uploads/snapshots/1b1/1b1d24ddcf936c4ce55380a720a473e1c2ccc982aaecb3d7c82ac96048ed8e32.sm.webp",
+      "session": "cf2bdd664a5c74a09ed118bfc192b3121f2a06d075346b8721cfd6c95140feaf",
       "fansub": "SubsPlease",
-      "created_at": "2024-03-01T12:00:00Z"
+      "created_at": "2026-09-29 12:38:40"
+    },
+    {
+      "id": "69d89177-7ac8-e4eb-4562-0f2b17992f11",
+      "title": "One Piece",
+      "episode": 1180,
+      "snapshot": "https://i.animepahe.pw/uploads/snapshots/ce2/ce2fe6de2b08bbcabe8c17deab306327ff7a9338962aca8d933919fe6c4bb768.sm.webp",
+      "session": "e422a3049ab5b8214fe7f80a68810632d8f84346e4b08ed152cdabcd117d7622",
+      "fansub": "SubsPlease",
+      "created_at": "2026-09-27 17:00:09"
     }
   ]
 }
 ```
 
-**Notes**
-
-* Uses the airing feed internally.
-* Validation or network failures return `results: []`.
-* Snapshot URLs are normalized to absolute URLs.
-* `id` is anime-level.
-* `session` is episode-level.
-
-Use this route for:
-
-* latest episode carousels
-* airing feeds
-* quick links into the episode stream route
+## Details
 
 ### Anime info
 
-#### Anime metadata
-
 `GET /anime/animepahe/info/:id`
 
-Returns textual and visual metadata for one anime.
+Returns the title, synopsis, artwork, airing dates, genres and links to the same anime on AniList, MyAnimeList, Kitsu and other databases. Line breaks in the synopsis are kept as `\n`.
 
-**Params**
+**Path parameters**
 
-* `id` required
+| Name | Required | Description |
+| --- | --- | --- |
+| `id` | Yes | Anime id from search or latest |
 
-Example shape:
+**Example**
+
+```bash
+curl "http://localhost:3000/anime/animepahe/info/513a0085-6e0d-a1df-9c14-aeec15a286f7"
+```
 
 ```json
 {
-  "id": "anime-id",
-  "name": "Anime Title",
-  "description": "Full synopsis...",
-  "poster": "https://....jpg",
-  "background": "https://....jpg",
-  "aired": "2015-04-05 to 2015-09-20",
-  "duration": "24 min. per ep.",
-  "genres": ["Action", "Adventure", "Fantasy"],
+  "id": "513a0085-6e0d-a1df-9c14-aeec15a286f7",
+  "name": "Frieren: Beyond Journey's End",
+  "description": "During their decade-long quest to defeat the Demon King, the members of the hero's party...\n\nHowever, the time that Frieren spends with her comrades is equivalent to merely a fraction of her life...",
+  "poster": "https://i.animepahe.pw/uploads/posters/93a/93a7bacea37d530426ca2a4ff26a6ae40dd1d2d6feb9dfe4752e0bd0e0bca4e1.webp",
+  "background": "https://i.animepahe.pw/uploads/defaults/cover_default3.webp",
+  "aired": "Sep 29, 2023 to Mar 22, 2024",
+  "duration": "24 minutes",
+  "genres": ["Adventure", "Award Winning", "Drama", "Fantasy"],
   "externalLinks": [
-    "https://myanimelist.net/anime/12345",
-    "https://anilist.co/anime/67890"
+    "https://anilist.co/anime/154587",
+    "https://anidb.net/anime/17617",
+    "https://www.animenewsnetwork.com/encyclopedia/anime.php?id=26334",
+    "https://kitsu.app/anime/46474",
+    "https://myanimelist.net/anime/52991"
   ]
 }
 ```
 
-```bash
-curl "http://localhost:3000/anime/animepahe/info/XXXXX"
-```
+`poster` and `background` are `null` when the page has no image.
 
-**Implementation details**
+## Episodes
 
-* Scrapes the anime page HTML.
-* Extracts the title, synopsis, poster, background, aired range, duration, genres, and external links.
-* Synopsis line breaks are preserved from upstream `<br>` tags.
-* External links are normalized to absolute URLs.
-
-{% hint style="warning" %}
-If parsing fails or the anime is missing, the route returns `{ "error": "Anime not found" }` as a payload-level error.
-{% endhint %}
-
-### Episodes
-
-#### Full episode list
+### Episode list
 
 `GET /anime/animepahe/episodes/:id`
 
-Returns all episodes for one anime.
+Returns every episode, sorted by episode number. The API fetches all of AnimePahe's release pages in parallel, so long series come back in one response (all 1180 One Piece episodes took about 1.4 seconds). `filler` is `true` for filler episodes, and `title` falls back to `Episode <n>` when the site has none.
 
-**Params**
+**Path parameters**
 
-* `id` required
+| Name | Required | Description |
+| --- | --- | --- |
+| `id` | Yes | Anime id from search or latest |
 
-Example shape:
+**Example**
+
+```bash
+curl "http://localhost:3000/anime/animepahe/episodes/513a0085-6e0d-a1df-9c14-aeec15a286f7"
+```
 
 ```json
 {
   "results": [
     {
-      "title": "Episode 1 Title",
+      "title": "Episode 1",
       "episode": 1,
-      "released": "2020-01-01T12:00:00.000Z",
-      "snapshot": "https://i.animepahe.si/screenshots/...jpg",
-      "duration": "24 min",
+      "released": "2023-09-29T09:33:47.000Z",
+      "snapshot": "https://i.animepahe.pw/uploads/snapshots/807/80781666d15cb43eb2892191a9b66ad07688aeae40319e02a9f12203223b3d44.sm.webp",
+      "duration": "00:26:01",
       "filler": false,
-      "session": "episode-session-id"
+      "session": "8ca7f1c359bc4ca807f72f2bab81a07b44833d85968ac491a253eb580adb6135"
+    },
+    {
+      "title": "Episode 2",
+      "episode": 2,
+      "released": "2023-09-29T17:27:53.000Z",
+      "snapshot": "https://i.animepahe.pw/uploads/snapshots/af6/af6c1923ca5ddad3341ee7c6c3ac9c336f7610604a4a9a672b763986b47a83a7.sm.webp",
+      "duration": "00:26:01",
+      "filler": false,
+      "session": "d2719a0c3b084d4207bbe0aac33d75baa844a417a346e780215840dd42238619"
     }
   ]
 }
 ```
 
-**Notes**
+## Streams
 
-* Uses the release API internally.
-* Fetches all pages if the upstream response has multiple pages.
-* Concatenates all results before transforming them.
-* Sorts episodes in ascending order.
-* Snapshot URLs are normalized.
-* `filler` is `true` when the upstream field is `1`.
-
-Typical use:
-
-* build an episode selector
-* map episode sessions to stream requests
-
-### Streaming
-
-#### Stream sources
+### Episode streams
 
 `GET /anime/animepahe/episode/:id/:session`
 
-Returns stream options for one episode.
+Returns every audio and quality variant of one episode. The response is newline-delimited JSON (`Content-Type: application/x-ndjson; charset=utf-8`): one stream object per line, written as each variant is resolved. Read it line by line instead of parsing the whole body as one JSON value.
 
-**Params**
+**Path parameters**
 
-* `id` required. Anime-level identifier
-* `session` required. Episode-level session
+| Name | Required | Description |
+| --- | --- | --- |
+| `id` | Yes | Anime id |
+| `session` | Yes | Episode session from the episode list or the latest feed |
 
-**Response format**
+**Example**
 
-This route streams NDJSON, not one JSON array.
-
-Each line is one complete `StreamResult` object.
-
-Example:
-
-```
-{"id":"...","title":"jpn / 720p", ...}
-{"id":"...","title":"eng / 1080p", ...}
+```bash
+curl "http://localhost:3000/anime/animepahe/episode/513a0085-6e0d-a1df-9c14-aeec15a286f7/8ca7f1c359bc4ca807f72f2bab81a07b44833d85968ac491a253eb580adb6135"
 ```
 
-Example yielded shape:
+The response had six lines (`jpn` and `eng` at 360p, 720p and 1080p). The first two:
 
 ```json
-{
-  "id": "animeId--720--jpn",
-  "title": "jpn / 720p",
-  "url": "https://kwik.cx/...",
-  "directUrl": "https://...m3u8-or-similar...",
-  "quality": "720",
-  "audio": "jpn",
-  "downloadUrl": "https://kwik.cx/mp4/...?...file=Title_-_Sub_-_720p_-_Episode_1.mp4",
-  "corsHeaders": {
-    "Referer": "https://kwik.cx/"
-  }
+{"id":"513a0085-6e0d-a1df-9c14-aeec15a286f7--360--jpn","title":"jpn / 360p","url":"https://kwik.cx/e/aeNSh4eblrse","directUrl":"https://vault-08.uwucdn.top/stream/08/13/63abd0640a098853df01676699553c949b1b3038117d9f59232d56ca53be3fef/uwu.m3u8","proxiedUrl":"http://localhost:3000/proxy/m3u8-proxy?url=https%3A%2F%2Fvault-08.uwucdn.top%2Fstream%2F08%2F13%2F63abd0640a098853df01676699553c949b1b3038117d9f59232d56ca53be3fef%2Fuwu.m3u8&headers=%7B%22Referer%22%3A%22https%3A%2F%2Fkwik.cx%2F%22%7D","quality":"360","audio":"jpn","downloadUrl":"https://vault-08.uwucdn.top/mp4/08/13/63abd0640a098853df01676699553c949b1b3038117d9f59232d56ca53be3fef?file=Frieren_Beyond_Journey_s_End_-_Sub_-_360p_-_Episode_1.mp4","corsHeaders":{"Referer":"https://kwik.cx/"}}
+{"id":"513a0085-6e0d-a1df-9c14-aeec15a286f7--720--jpn","title":"jpn / 720p","url":"https://kwik.cx/e/d3ccaeXzK7o4","directUrl":"https://vault-08.uwucdn.top/stream/08/13/71ee7618f3b7b9ad4467c6fdcd0d0bbc4af2345d95d9a793d71db77539a43af7/uwu.m3u8","proxiedUrl":"http://localhost:3000/proxy/m3u8-proxy?url=https%3A%2F%2Fvault-08.uwucdn.top%2Fstream%2F08%2F13%2F71ee7618f3b7b9ad4467c6fdcd0d0bbc4af2345d95d9a793d71db77539a43af7%2Fuwu.m3u8&headers=%7B%22Referer%22%3A%22https%3A%2F%2Fkwik.cx%2F%22%7D","quality":"720","audio":"jpn","downloadUrl":"https://vault-08.uwucdn.top/mp4/08/13/71ee7618f3b7b9ad4467c6fdcd0d0bbc4af2345d95d9a793d71db77539a43af7?file=Frieren_Beyond_Journey_s_End_-_Sub_-_720p_-_Episode_1.mp4","corsHeaders":{"Referer":"https://kwik.cx/"}}
+```
+
+**Stream fields**
+
+| Field | Description |
+| --- | --- |
+| `id` | `<anime id>--<quality>--<audio>` |
+| `title` | `<audio> / <quality>p` |
+| `url` | The kwik embed page |
+| `directUrl` | The HLS playlist. It only plays with `Referer: https://kwik.cx/` |
+| `proxiedUrl` | The same playlist through the API's [stream proxy](../../core/proxy.md), with the referer already attached. Use this in a browser player |
+| `quality` | `360`, `720` or `1080` |
+| `audio` | `jpn` for the original audio, `eng` for the English dub |
+| `downloadUrl` | An MP4 download link with a readable file name, or `null` |
+| `corsHeaders` | Headers needed to fetch `directUrl` yourself |
+
+Reading the stream in TypeScript:
+
+```ts
+const res = await fetch(
+  "http://localhost:3000/anime/animepahe/episode/513a0085-6e0d-a1df-9c14-aeec15a286f7/8ca7f1c359bc4ca807f72f2bab81a07b44833d85968ac491a253eb580adb6135",
+);
+const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
+let buffer = "";
+for (;;) {
+  const { value, done } = await reader.read();
+  if (done) break;
+  buffer += value;
+  const lines = buffer.split("\n");
+  buffer = lines.pop()!;
+  for (const line of lines) if (line) console.log(JSON.parse(line).title);
 }
 ```
 
-**How it works**
+A variant that cannot be resolved is skipped; the other lines are still sent.
 
-* Loads the play page for the anime and episode session.
-* Scrapes audio, quality, and kwik source links.
-* Scrapes matching download links when available.
-* Streams each resolved result back line by line.
+## Errors
 
-**Direct and HLS extraction**
+| Status | When |
+| --- | --- |
+| `404` | `info` or `episodes`: the anime id does not exist (`{ "error": "Anime not found" }`). `episode`: the session is wrong or the episode has no playable streams (`{ "error": "No streams found" }`) |
+| `502` | AnimePahe failed, returned something that is not JSON, or blocked the request and the Cloudflare challenge could not be solved, for example `{ "error": "Animepahe responded 503" }` |
 
-1. It tries direct source extraction first.
-2. If needed, it falls back to HLS extraction.
-3. It builds a download-friendly URL when possible.
+Search and latest never return `404`; no matches gives `{ "results": [] }`.
 
-**Client handling**
+## Notes
 
-Parse the response line by line.
-
-Do not expect a single JSON array payload.
-
-Typical flow:
-
-1. Call `/anime/animepahe/episodes/:id`
-2. Pick an episode
-3. Read `episode.session`
-4. Call `/anime/animepahe/episode/:id/:session`
-5. Collect stream variants for a quality or audio picker
-
-### ID and session rules
-
-AnimePahe uses two identifiers:
-
-* anime-level `id`
-* episode-level `session`
-
-General rule:
-
-* use `id` for `/info/:id`
-* use `id` for `/episodes/:id`
-* use both `id` and `session` for `/episode/:id/:session`
-
-Search and latest results already expose the values you need.
-
-### Error handling
-
-Search, latest, and episodes:
-
-* upstream validation failures return empty arrays
-* network failures return safe fallback payloads
-
-Info:
-
-* parsing failures return `{ "error": "Anime not found" }`
-* treat that as an application-level error
-
-Streams:
-
-* failures for one quality or audio variant do not stop the whole stream
-* broken variants are skipped
-
-{% hint style="info" %}
-Like any scraping provider, AnimePahe can break when upstream HTML or API structures change.
-{% endhint %}
-
-### When to use AnimePahe
-
-AnimePahe is a good fit when you need:
-
-* rich search results with year, score, and status
-* a latest-airing feed
-* full episode lists with filler flags
-* multiple stream variants per episode
-* direct and download-friendly playback URLs
-
-It works well alongside other anime providers if you want broader source coverage.
+* The first request after the server starts is slower because the API solves AnimePahe's Cloudflare challenge in a headless browser (about 7 seconds in testing). Later requests reuse the clearance cookie and take well under a second. If the challenge cannot be solved, the API waits 10 minutes before trying the browser again and returns `502` in the meantime.
+* The stream route waits for the first variant before it answers, so a `404` arrives as normal JSON rather than as an empty stream.
+* Typical flow: `search` → `episodes/:id` → `episode/:id/:session`. The `latest` feed already gives you `id` and `session`, so you can go straight to the stream route.
+* `externalLinks` in `info` contains the AniList id (`https://anilist.co/anime/154587`), which you can use with AniList-based providers such as [Miruro](miruro.md) and [Animelok](animelok.md).

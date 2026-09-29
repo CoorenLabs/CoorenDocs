@@ -1,98 +1,74 @@
 ---
+description: Home sections, search, popular lists, genre and author browsing, chapter lists and page images from All Manga.
 icon: book
 ---
 
 # All Manga
 
-## AllManga
-
-AllManga exposes discovery, search, detail, reading, and image proxy endpoints.
-
-Use it when you need a manga catalog with filters, generated chapter lists, and proxied reader images.
+All Manga uses the GraphQL API behind [allmanga.to](https://allmanga.to) for home sections, search, popular lists, tags and details. Chapter pages come from the site's reader, which Cooren opens in a real browser, so `/read` takes several seconds. The site rate limits bursts of requests, so space out calls.
 
 {% hint style="info" %}
-Base route: `GET /manga/allmanga/...`
+Base route: `/manga/allmanga`
 {% endhint %}
 
-### Overview
+## Routes
 
-AllManga supports:
+| Route | Description |
+| --- | --- |
+| `GET /manga/allmanga` | Provider status |
+| `GET /manga/allmanga/home` | Home sections |
+| `GET /manga/allmanga/search` | Search titles |
+| `GET /manga/allmanga/latest` | Recently updated titles |
+| `GET /manga/allmanga/popular` | Popular titles by period |
+| `GET /manga/allmanga/random` | Random titles |
+| `GET /manga/allmanga/tags` | Genre, theme and magazine tags |
+| `GET /manga/allmanga/genre/:genre` | Titles in one genre |
+| `GET /manga/allmanga/author/:author` | Titles by one author |
+| `GET /manga/allmanga/detail` | Full details and chapter list |
+| `GET /manga/allmanga/read` | Page images of one chapter |
+| `GET /manga/allmanga/image/*` | Image proxy |
 
-* home sections
-* full-text search
-* latest updates
-* popular lists by period
-* random recommendations
-* tag and filter discovery
-* manga detail with chapter list
-* chapter page reading
-* image proxying
+Every route except the status route and the image proxy returns `{ "status", "success", "data" }`. Errors return the same envelope with a `message` and `data: null`.
 
-IDs and conventions:
+### Title cards
 
-* manga ID: AllManga `_id`
-* chapter ID: `mangaId:translationType:chapterNumber`
-* example chapter ID: `12345:sub:12`
-
-Common card shape:
-
-```ts
-type AllMangaCard = {
-  id: string;
-  title: string;
-  englishTitle: string;
-  nativeTitle: string;
-  cover: string;
-  score: number;
-  availableChapters: {
-    sub: number;
-    raw: number;
-  };
-};
-```
-
-### Status
-
-#### Provider status
-
-`GET /manga/allmanga/`
-
-Returns a simple health and description payload.
-
-Example shape:
+Home, search, latest, popular, random, genre and author return titles in this shape:
 
 ```json
 {
-  "provider": "AllManga",
-  "status": "operational",
-  "description": "AllManga is a comprehensive manga database and reading platform...",
-  "message": "AllManga provider is running. Visit /docs for available endpoints."
+  "id": "Jy8Bxgx4wSFMeNeeS",
+  "title": "Sousou no Frieren",
+  "englishTitle": "Frieren: Beyond Journey's End",
+  "nativeTitle": "葬送のフリーレン",
+  "cover": "http://localhost:3000/manga/allmanga/image/wp.youtube-anime.com/aln.youtube-anime.com/mcovers/m_tbs/AMgSkBPBjeoXCyRZn/014.webp?w=250",
+  "score": 8.86,
+  "availableChapters": {
+    "sub": 158,
+    "raw": 0
+  }
 }
 ```
 
-Use this for:
+* `id` is what `/detail` expects.
+* `englishTitle` and `nativeTitle` are empty strings when unknown. `cover` and `score` can be `null`.
+* `availableChapters.sub` is the number of English chapters, `raw` the number of untranslated ones.
+* `cover` already points at [the image route](#image-proxy).
 
-* health checks
-* quick provider discovery
-* setup verification
+## Home
 
-### Home
-
-#### Home sections
+### Home sections
 
 `GET /manga/allmanga/home`
 
-Returns a set of curated discovery sections.
+Returns a list of sections, each with an `id`, a `title` and `items` (title cards). The first four are always requested: `popular-daily` (15 titles), `latest` (26), `manga-<current year>` (26) and `random` (30). They are followed by the tag sections All Manga features on its home page; their `id` is the tag slug, for example `theme:single_parent` or `young_king_ours-magazine`, and there were 11 of them on 2026-09-29. Empty or failed sections are left out.
 
-Typical sections include:
+**Example**
 
-* popular manga
-* latest updates
-* current-year manga
-* random recommendations
-* predefined tag-based lists
+```bash
+curl "http://localhost:3000/manga/allmanga/home"
+```
 
-Example shape:
+The response below shows two of the 15 sections, each trimmed to one item.
 
 ```json
 {
@@ -102,63 +78,68 @@ Example shape:
     "provider": "AllManga",
     "sections": [
       {
-        "id": "popular-daily",
-        "title": "Popular Manga (Daily)",
-        "items": []
-      },
-      {
         "id": "latest",
         "title": "Latest Updates",
-        "items": []
+        "items": [
+          {
+            "id": "vo4J52L2BLzccYnee",
+            "title": "Yumemiru Renaissance",
+            "englishTitle": "Dreaming Renaissance",
+            "nativeTitle": "夢見るルネサンス",
+            "cover": "http://localhost:3000/manga/allmanga/image/cdn.myanimelist.net/images/manga/1/228988.webp",
+            "score": null,
+            "availableChapters": {
+              "sub": 1,
+              "raw": 0
+            }
+          }
+        ]
       },
       {
-        "id": "manga-2026",
-        "title": "Manga 2026",
-        "items": []
-      },
-      {
-        "id": "random",
-        "title": "Random Recommendations",
-        "items": []
+        "id": "theme:single_parent",
+        "title": "Single Parent",
+        "items": [
+          {
+            "id": "2zX9g6t8eiM8LMMCF",
+            "title": "Hotman",
+            "englishTitle": "Hotman",
+            "nativeTitle": "ホットマン",
+            "cover": "http://localhost:3000/manga/allmanga/image/s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx33608-ky15HmpkPEM7.jpg",
+            "score": 7.54,
+            "availableChapters": {
+              "sub": 167,
+              "raw": 0
+            }
+          }
+        ]
       }
     ]
   }
 }
 ```
 
-**Notes**
+The home page sends about 15 requests to All Manga at once, so it is the route most likely to lose sections to rate limiting. It returns `502` only when every section fails. With Redis enabled, the result is cached for 30 minutes.
 
-* Home mixes multiple internal parsers.
-* Tag sections are curated in code.
-* Empty sections are omitted.
+## Search and lists
 
-### Search and filters
+### Search
 
-#### General search
+`GET /manga/allmanga/search`
 
-`GET /manga/allmanga/search?q={query}&page={page}`
+Searches titles, 26 per page. Adult titles are excluded. Results include titles with no English chapters: for `frieren`, 10 of the 12 results had `availableChapters.sub: 0`, so check it before linking to a reader.
 
-Searches manga with pagination.
+**Query parameters**
 
-**Query params**
+| Name | Required | Default | Description |
+| --- | --- | --- | --- |
+| `q` | Yes | | Search text |
+| `page` | No | `1` | Page number |
 
-* `q` required
-* `page` optional. Default is `1`
+**Example**
 
-If `q` is missing, the route returns `400`.
-
-Example error:
-
-```json
-{
-  "status": 400,
-  "success": false,
-  "message": "Query parameter 'q' is required",
-  "data": null
-}
+```bash
+curl "http://localhost:3000/manga/allmanga/search?q=frieren"
 ```
-
-Example success shape:
 
 ```json
 {
@@ -166,56 +147,101 @@ Example success shape:
   "success": true,
   "data": {
     "provider": "AllManga",
-    "total": 123,
+    "total": 12,
     "page": 1,
-    "results": []
+    "results": [
+      {
+        "id": "Jy8Bxgx4wSFMeNeeS",
+        "title": "Sousou no Frieren",
+        "englishTitle": "Frieren: Beyond Journey's End",
+        "nativeTitle": "葬送のフリーレン",
+        "cover": "http://localhost:3000/manga/allmanga/image/wp.youtube-anime.com/aln.youtube-anime.com/mcovers/m_tbs/AMgSkBPBjeoXCyRZn/014.webp?w=250",
+        "score": 8.86,
+        "availableChapters": {
+          "sub": 158,
+          "raw": 0
+        }
+      },
+      {
+        "id": "8sHYEKgu69sPBBuq4",
+        "title": "Sousou no Frieren dj: Ippan Saiin Mahou Otsuyu Dark",
+        "englishTitle": "",
+        "nativeTitle": "",
+        "cover": null,
+        "score": null,
+        "availableChapters": {
+          "sub": 0,
+          "raw": 0
+        }
+      }
+    ]
   }
 }
 ```
 
-**Notes**
+### Latest
 
-* Uses the AllManga GraphQL API internally.
-* Search defaults to manga-only results.
-* Adult and unknown entries are filtered out.
-* Default translation type is `sub`.
+`GET /manga/allmanga/latest`
 
-#### Latest updates
+Returns recently updated titles, 26 per page, in the same shape as search. `total` stops at 2600 for this and other broad lists.
 
-`GET /manga/allmanga/latest?page={page}`
+**Query parameters**
 
-Returns the latest updated manga list.
+| Name | Required | Default | Description |
+| --- | --- | --- | --- |
+| `page` | No | `1` | Page number |
 
-**Query params**
+**Example**
 
-* `page` optional. Default is `1`
+```bash
+curl "http://localhost:3000/manga/allmanga/latest"
+```
 
-The response shape matches the general search route.
+```json
+{
+  "status": 200,
+  "success": true,
+  "data": {
+    "provider": "AllManga",
+    "total": 2600,
+    "page": 1,
+    "results": [
+      {
+        "id": "GFWNXAFm4YxYWWS6x",
+        "title": "Gokusotsu Kraken",
+        "englishTitle": "",
+        "nativeTitle": "獄卒クラーケン",
+        "cover": "http://localhost:3000/manga/allmanga/image/wp.youtube-anime.com/aln.youtube-anime.com/mcovers/m_tbs/Wy8X6C6ydCXAtN4n2/007.jpg?w=250",
+        "score": 6.92,
+        "availableChapters": {
+          "sub": 54,
+          "raw": 0
+        }
+      }
+    ]
+  }
+}
+```
 
-**Notes**
+### Popular
 
-* Internally uses the same search parser with an empty query.
+`GET /manga/allmanga/popular`
 
-#### Popular
+Returns the most popular manga over a period. Adult titles are excluded.
 
-`GET /manga/allmanga/popular?page={page}&size={size}&period={period}`
+**Query parameters**
 
-Returns popular manga with a selectable ranking window.
+| Name | Required | Default | Description |
+| --- | --- | --- | --- |
+| `period` | No | `daily` | `daily` (last day), `weekly` (7 days), `monthly` (30 days) or `all` (all time). Any other value returns `400` |
+| `size` | No | `20` | Titles per page, 1 to 100. All Manga returned at most 50 even when more were asked for |
+| `page` | No | `1` | Page number |
 
-**Query params**
+**Example**
 
-* `page` optional. Default is `1`
-* `size` optional. Default is `20`
-* `period` optional. Default is `daily`
-
-Supported `period` values:
-
-* `daily`
-* `weekly`
-* `monthly`
-* `all`
-
-Example shape:
+```bash
+curl "http://localhost:3000/manga/allmanga/popular?period=weekly&size=5"
+```
 
 ```json
 {
@@ -226,25 +252,35 @@ Example shape:
     "total": 500,
     "page": 1,
     "period": "weekly",
-    "results": []
+    "results": [
+      {
+        "id": "JJHbe9N2pe94w7t2S",
+        "title": "All-Class Awakening: God Slayer",
+        "englishTitle": "All-Class Awakening: God Slayer",
+        "nativeTitle": "全职觉醒",
+        "cover": "http://localhost:3000/manga/allmanga/image/s4.anilist.co/file/anilistcdn/media/manga/cover/medium/b197224-Pvwfb85Sswpl.jpg",
+        "score": null,
+        "availableChapters": {
+          "sub": 156,
+          "raw": 0
+        }
+      }
+    ]
   }
 }
 ```
 
-**Notes**
-
-* `daily` maps to 1 day
-* `weekly` maps to 7 days
-* `monthly` maps to 30 days
-* `all` removes the date filter
-
-#### Random recommendations
+### Random
 
 `GET /manga/allmanga/random`
 
-Returns a random set of manga recommendations.
+Returns 30 random manga. Most have no English chapters: in the call below all 30 had `availableChapters.sub: 0`, so this route is better for discovery than for reading.
 
-Example shape:
+**Example**
+
+```bash
+curl "http://localhost:3000/manga/allmanga/random"
+```
 
 ```json
 {
@@ -252,18 +288,43 @@ Example shape:
   "success": true,
   "data": {
     "provider": "AllManga",
-    "results": []
+    "results": [
+      {
+        "id": "uabgyPLqMRGCv8kHe",
+        "title": "Uma Musume Pispis☆Spispi Gold Ship",
+        "englishTitle": "",
+        "nativeTitle": "ウマ娘 ピスピス☆スピスピ ゴルシちゃん",
+        "cover": "http://localhost:3000/manga/allmanga/image/s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx170592-2IlKhaVeBPRR.jpg",
+        "score": null,
+        "availableChapters": {
+          "sub": 0,
+          "raw": 0
+        }
+      }
+    ]
   }
 }
 ```
 
-#### Tags and genres
+## Browse
+
+### Tags
 
 `GET /manga/allmanga/tags`
 
-Returns available tags, genres, and magazines with counts.
+Returns All Manga's manga tags, 100 per page, with the number of titles for each. `type` is `magazine` for magazines and `genre` for everything else, including themes.
 
-Example shape:
+**Query parameters**
+
+| Name | Required | Default | Description |
+| --- | --- | --- | --- |
+| `page` | No | `1` | Page number |
+
+**Example**
+
+```bash
+curl "http://localhost:3000/manga/allmanga/tags"
+```
 
 ```json
 {
@@ -271,79 +332,53 @@ Example shape:
   "success": true,
   "data": {
     "provider": "AllManga",
+    "total": 30766,
+    "page": 1,
     "tags": [
       {
-        "name": "Action",
-        "slug": "action",
+        "name": "Isekai",
+        "slug": "theme:isekai",
         "type": "genre",
-        "count": 1200
+        "count": 537
       },
       {
-        "name": "Shounen Jump (Weekly)",
-        "slug": "shounen_jump_weekly_-magazine",
+        "name": "Naver Webtoon",
+        "slug": "naver_webtoon-magazine",
         "type": "magazine",
-        "count": 300
+        "count": 1457
       }
     ]
   }
 }
 ```
 
-Use this route to build:
+`total` is only filled on page 1; later pages return `total: 0`. The `slug` values do not work with `/genre/:genre`; see below.
 
-* filter pills
-* dropdowns
-* genre and magazine selectors
+### Genre
 
-#### Search by genre
+`GET /manga/allmanga/genre/:genre`
 
-`GET /manga/allmanga/genre/:genre?page={page}`
+Returns titles in one genre, 26 per page, in the same order and shape as `/latest`.
 
-Filters manga by a genre slug.
+**Path parameters**
 
-**Params**
+| Name | Required | Description |
+| --- | --- | --- |
+| `genre` | Yes | Genre name exactly as in `genres[].slug` from `/detail`, URL-encoded, for example `Action` or `Slice%20of%20Life`. Case-sensitive: `action` returns nothing |
 
-* `genre` required
-* `page` optional. Default is `1`
+**Query parameters**
 
-The response shape matches the search route.
+| Name | Required | Default | Description |
+| --- | --- | --- | --- |
+| `page` | No | `1` | Page number |
 
-**Notes**
+Some tag names from `/tags` also work (`Isekai` and `Boys' Love` returned results) and others do not (`Borderline H` and `Naver Webtoon` returned nothing). Tag slugs such as `theme:isekai` return an empty list.
 
-* Internally injects `genres: [genre]` into the search args.
+**Example**
 
-#### Search by author
-
-`GET /manga/allmanga/author/:author?page={page}`
-
-Filters manga by an author slug.
-
-**Params**
-
-* `author` required
-* `page` optional. Default is `1`
-
-The response shape matches the search route.
-
-**Notes**
-
-* Internally injects `authors: [author]` into the search args.
-
-### Manga detail and chapters
-
-#### Manga detail
-
-`GET /manga/allmanga/detail?id={id}`
-
-Returns metadata and a generated chapter list for one manga.
-
-**Query params**
-
-* `id` required
-
-If `id` is missing, the route returns `400`.
-
-Example shape:
+```bash
+curl "http://localhost:3000/manga/allmanga/genre/Isekai"
+```
 
 ```json
 {
@@ -351,35 +386,136 @@ Example shape:
   "success": true,
   "data": {
     "provider": "AllManga",
-    "id": "12345",
-    "title": "Manga Title",
-    "englishTitle": "English Title",
-    "nativeTitle": "Original Title",
-    "cover": "https://.../manga/allmanga/image/...",
-    "description": "Cleaned description text...",
+    "total": 2600,
+    "page": 1,
+    "results": [
+      {
+        "id": "GFWNXAFm4YxYWWS6x",
+        "title": "Gokusotsu Kraken",
+        "englishTitle": "",
+        "nativeTitle": "獄卒クラーケン",
+        "cover": "http://localhost:3000/manga/allmanga/image/wp.youtube-anime.com/aln.youtube-anime.com/mcovers/m_tbs/Wy8X6C6ydCXAtN4n2/007.jpg?w=250",
+        "score": 6.92,
+        "availableChapters": {
+          "sub": 54,
+          "raw": 0
+        }
+      }
+    ]
+  }
+}
+```
+
+### Author
+
+`GET /manga/allmanga/author/:author`
+
+Returns titles by one author, 26 per page, in the same shape as search.
+
+**Path parameters**
+
+| Name | Required | Description |
+| --- | --- | --- |
+| `author` | Yes | Author name exactly as in `authors[].slug` from `/detail`, URL-encoded, for example `Yamada%20Kanehito`. Case-sensitive: `yamada kanehito` returns nothing |
+
+**Query parameters**
+
+| Name | Required | Default | Description |
+| --- | --- | --- | --- |
+| `page` | No | `1` | Page number |
+
+**Example**
+
+```bash
+curl "http://localhost:3000/manga/allmanga/author/Yamada%20Kanehito"
+```
+
+```json
+{
+  "status": 200,
+  "success": true,
+  "data": {
+    "provider": "AllManga",
+    "total": 1,
+    "page": 1,
+    "results": [
+      {
+        "id": "Jy8Bxgx4wSFMeNeeS",
+        "title": "Sousou no Frieren",
+        "englishTitle": "Frieren: Beyond Journey's End",
+        "nativeTitle": "葬送のフリーレン",
+        "cover": "http://localhost:3000/manga/allmanga/image/wp.youtube-anime.com/aln.youtube-anime.com/mcovers/m_tbs/AMgSkBPBjeoXCyRZn/014.webp?w=250",
+        "score": 8.86,
+        "availableChapters": {
+          "sub": 158,
+          "raw": 0
+        }
+      }
+    ]
+  }
+}
+```
+
+## Details
+
+### Title details
+
+`GET /manga/allmanga/detail`
+
+Returns metadata and the list of English chapters, newest first. Each chapter `id` is what `/read` expects.
+
+**Query parameters**
+
+| Name | Required | Default | Description |
+| --- | --- | --- | --- |
+| `id` | Yes | | All Manga title id from any list, for example `Jy8Bxgx4wSFMeNeeS` |
+
+**Example**
+
+```bash
+curl "http://localhost:3000/manga/allmanga/detail?id=Jy8Bxgx4wSFMeNeeS"
+```
+
+```json
+{
+  "status": 200,
+  "success": true,
+  "data": {
+    "provider": "AllManga",
+    "id": "Jy8Bxgx4wSFMeNeeS",
+    "title": "Sousou no Frieren",
+    "englishTitle": "Frieren: Beyond Journey's End",
+    "nativeTitle": "葬送のフリーレン",
+    "cover": "http://localhost:3000/manga/allmanga/image/wp.youtube-anime.com/aln.youtube-anime.com/mcovers/m_tbs/AMgSkBPBjeoXCyRZn/014.webp?w=250",
+    "description": "The Demon King has been defeated, and the victorious hero party returns home before disbanding. The...",
     "genres": [
-      { "genre": "Action", "slug": "action" },
-      { "genre": "Romance", "slug": "romance" }
+      { "genre": "Adventure", "slug": "Adventure" },
+      { "genre": "Demons", "slug": "Demons" }
     ],
     "authors": [
-      { "author": "Some Author", "slug": "some_author" }
+      { "author": "Abe Tsukasa", "slug": "Abe Tsukasa" },
+      { "author": "Yamada Kanehito", "slug": "Yamada Kanehito" }
     ],
-    "status": "Ongoing",
-    "totalChapters": 45,
+    "status": "Releasing",
+    "totalChapters": 158,
     "rawChapters": 0,
-    "airedStart": "2020-01-01",
-    "airedEnd": null,
+    "airedStart": {
+      "year": 2020,
+      "month": 3,
+      "date": 28
+    },
+    "airedEnd": {},
     "chapterList": [
       {
-        "id": "12345:sub:45",
-        "number": 45,
-        "title": "Chapter 45",
+        "id": "Jy8Bxgx4wSFMeNeeS:sub:147",
+        "number": 147,
+        "title": "Chapter 147",
         "lang": "sub"
       },
       {
-        "id": "12345:sub:44",
-        "number": 44,
-        "title": "Chapter 44",
+        "id": "Jy8Bxgx4wSFMeNeeS:sub:146",
+        "number": 146,
+        "title": "Chapter 146",
         "lang": "sub"
       }
     ]
@@ -387,44 +523,30 @@ Example shape:
 }
 ```
 
-**How it works**
+* Chapter ids have the form `<titleId>:sub:<number>`. Numbers can be decimal (`Jy8Bxgx4wSFMeNeeS:sub:114.5`).
+* `genres[].slug` and `authors[].slug` are the values `/genre/:genre` and `/author/:author` expect. `authors` can include names in Japanese as well.
+* `description` is plain text with the HTML removed.
+* `airedStart` and `airedEnd` are objects with `year`, `month` and `date`; `airedEnd` is `{}` for ongoing series.
 
-* Loads GraphQL metadata for the manga.
-* Scrapes the manga HTML page for extra fields.
-* Extracts description and cover.
-* Extracts genre and author slugs from page links.
-* Derives `totalChapters` from `availableChapters.sub`.
-* Builds `chapterList` in descending order.
+## Read
 
-Chapter IDs are generated like:
+### Chapter pages
 
-```txt
-mangaId:sub:chapterNumber
+`GET /manga/allmanga/read`
+
+Returns the page images of one chapter in reading order. The API loads the chapter in All Manga's reader in a real browser and collects the image URLs, which is why this route is slow.
+
+**Query parameters**
+
+| Name | Required | Default | Description |
+| --- | --- | --- | --- |
+| `id` | Yes | | Chapter id from `/detail`, in the form `<titleId>:<translation>:<number>`, for example `Jy8Bxgx4wSFMeNeeS:sub:147`. `<translation>` defaults to `sub` and `<number>` to `1` when left out, so `id=Jy8Bxgx4wSFMeNeeS` reads chapter 1. Each part may only contain letters, digits, `_`, `.` and `-` |
+
+**Example**
+
+```bash
+curl "http://localhost:3000/manga/allmanga/read?id=Jy8Bxgx4wSFMeNeeS:sub:147"
 ```
-
-#### Read chapter
-
-`GET /manga/allmanga/read?id={chapterId}`
-
-Returns all page images for one chapter.
-
-**Query params**
-
-* `id` required
-
-Expected `id` format:
-
-```txt
-mangaId:translationType:chapterNumber
-```
-
-Example:
-
-```txt
-12345:sub:12
-```
-
-Example shape:
 
 ```json
 {
@@ -432,110 +554,60 @@ Example shape:
   "success": true,
   "data": {
     "provider": "AllManga",
-    "id": "12345:sub:12",
+    "id": "Jy8Bxgx4wSFMeNeeS:sub:147",
     "pages": [
       {
         "page": 1,
-        "img": "https://.../manga/allmanga/image/..."
+        "img": "http://localhost:3000/manga/allmanga/image/ytimgf.youtube-anime.com/images9/Jy8Bxgx4wSFMeNeeS/147/sub_1760490481/1.png"
       },
       {
         "page": 2,
-        "img": "https://.../manga/allmanga/image/..."
+        "img": "http://localhost:3000/manga/allmanga/image/ytimgf.youtube-anime.com/images9/Jy8Bxgx4wSFMeNeeS/147/sub_1760490481/2.png"
       }
     ]
   }
 }
 ```
 
-**Notes**
+{% hint style="warning" %}
+`/read` needs Chrome on the server (see [Browser providers](../../getting-started/configuration.md#browser-providers)) and takes roughly 3 to 10 seconds per chapter. During testing the first call took 7 seconds because it also started the browser, and later chapters took 2.5 to 4 seconds. A chapter number that does not exist takes about 7 seconds to return `404`.
+{% endhint %}
 
-* Splits the chapter ID into manga ID, translation type, and chapter number.
-* Reconstructs the image URLs from `pictureUrlHead` and `pictureUrls`.
-* Forces absolute HTTPS image URLs.
-* Wraps all page images with the image proxy route.
+Requests for the same chapter that arrive while it is loading share one browser load. With Redis enabled, page lists are cached for 24 hours.
 
-Recommended flow:
-
-1. Call `/manga/allmanga/detail?id={mangaId}`
-2. Read `chapterList`
-3. Pick a chapter ID
-4. Call `/manga/allmanga/read?id={chapterId}`
-5. Render `pages[].img` in the reader
+## Images
 
 ### Image proxy
 
-#### Proxy image
-
 `GET /manga/allmanga/image/*`
 
-Proxies AllManga CDN images through your server.
+Serves covers and chapter pages. Every image URL in the responses above already points here, so use them as they are. The part after `/image/` is the upstream URL without `https://`; any query string (such as `?w=250` on covers) is passed on. Covers come from several hosts (`wp.youtube-anime.com`, `s4.anilist.co`, `cdn.myanimelist.net`, `cdn.mangaupdates.com`) and pages from `ytimgf.youtube-anime.com`.
 
-Use the proxied image URLs returned by the provider.
-
-Do not call the upstream CDN directly from the client.
-
-**Behavior**
-
-1. Reconstructs the target URL from the wildcard path.
-2. Fetches the image with a valid image accept header.
-3. Sends the request with `Referer: https://allmanga.to/`.
-4. Returns raw image bytes.
-5. Sets a safe cache header.
-
-Returned headers include:
-
-* `Content-Type` from upstream, or `image/jpeg`
-* `Cache-Control: public, max-age=86400`
-
-If proxying fails, the route returns an error envelope with the right status code.
-
-### Error model
-
-Successful responses use:
-
-```json
-{
-  "status": 200,
-  "success": true,
-  "data": {}
-}
+```bash
+curl -o 1.png "http://localhost:3000/manga/allmanga/image/ytimgf.youtube-anime.com/images9/Jy8Bxgx4wSFMeNeeS/147/sub_1760490481/1.png"
 ```
 
-Errors use:
+The route requests the image with `Referer: https://allmanga.to/`, follows up to 3 redirects and returns the raw bytes with the upstream `Content-Type` (`image/png`, `image/webp`, `image/jpeg`, ...) and `Cache-Control: public, max-age=604800, immutable`. Errors are plain text, not JSON:
 
-```json
-{
-  "status": 400,
-  "success": false,
-  "message": "Error text",
-  "data": null
-}
-```
+| Status | Body | When |
+| --- | --- | --- |
+| `400` | `Invalid image URL` or `Invalid image host` | The path is not a valid public hostname and path |
+| `403` | `Forbidden image host` | The host resolves to a private or local address |
+| `404` and other upstream statuses | `Image unavailable` | The upstream returned an error |
+| `502` | `Image unavailable` | The upstream could not be reached or did not return an image |
 
-Common failures:
+## Errors
 
-* missing `q` on search
-* missing `id` on detail or read
-* upstream GraphQL or site errors
-* missing chapter page data
+| Status | When |
+| --- | --- |
+| `400` | `q` or `id` is missing, `period` is not `daily`, `weekly`, `monthly` or `all`, or the chapter id has invalid characters (`Invalid chapter id`) |
+| `404` | Unknown title id (`Manga not found`) or a chapter with no pages (`Chapter pages not found`) |
+| `502` | The All Manga API returned an error, the reader returned incomplete pages, or every home section failed |
+| `503` | All Manga is rate limiting (`AllManga is rate limiting requests, try again shortly`), asks for a captcha, or the reader's Cloudflare check did not complete |
+| `504` | The All Manga API or the reader timed out |
 
-### Typical workflow
+## Notes
 
-#### Discovery flow
-
-1. Load `/manga/allmanga/home`
-2. Use `/manga/allmanga/search?q={query}&page=1` for search
-3. Use `/manga/allmanga/tags` for filter UI
-4. Use `/manga/allmanga/genre/{slug}?page=1` or `/manga/allmanga/author/{slug}?page=1`
-5. Use `/manga/allmanga/popular?period=daily|weekly|monthly|all`
-
-#### Reading flow
-
-1. User opens a manga card
-2. Load `/manga/allmanga/detail?id={mangaId}`
-3. Render metadata and `chapterList`
-4. User picks a chapter
-5. Load `/manga/allmanga/read?id={chapterId}`
-6. Render the returned page images
-
-AllManga is a good fit when you want one provider to cover both manga discovery and the full reading flow.
+* Flow: any list gives `id`, `/detail?id=` gives `chapterList[].id`, `/read?id=` gives `pages[].img`.
+* All Manga rate limits bursts. When 15 searches were sent at once, 10 succeeded and 5 returned `503`. Send requests one after another and retry a `503` after a short pause.
+* List and detail routes answered in 0.6 to 0.9 seconds during testing; `/home` took about 2 seconds.

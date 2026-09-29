@@ -1,73 +1,75 @@
 ---
+description: Anime providers for search, discovery, episode lists and playable streams.
 icon: tv
 ---
 
 # Anime
 
-## Anime
-
-The anime module exposes multiple providers behind one route group.
-
-Use it for anime search, browse flows, metadata, schedules, and streaming sources.
+The anime group holds seven providers, each under its own route. Some are keyed by the site's own ids and slugs (AnimePahe, ToonStream, AnimeSaturn, AnimeUnity); the others take AniList ids (Miruro, Animelok, Anivexa), so an id from one of them works in the others.
 
 {% hint style="info" %}
-Base route: `GET /anime/...`
+Base route: `/anime`
 {% endhint %}
 
-### Overview
+## Providers
 
-Current providers:
+| Provider | Good for | Page |
+| --- | --- | --- |
+| AnimePahe | Search, latest releases, full episode lists, Japanese and English-dub HLS streams at 360p to 1080p with MP4 download links | [AnimePahe](animepahe.md) |
+| ToonStream | Anime and Western cartoons with Hindi, Tamil, Telugu and English dubs; home feed, movie and series browsing, HLS sources | [ToonStream](toonstream.md) |
+| Animelok | Paged episode lists and sub and dub embed players by AniList id | [Animelok](animelok.md) |
+| Miruro | AniList search, filters, trending, schedule and full details, plus episode lists with skip times and streams from several sites by AniList id | [Miruro](miruro.md) |
+| Anivexa | Episodes and streams from a dozen sites by AniList id, and id mappings | [Anivexa](anivexa.md) |
+| AnimeSaturn | Italian-language anime: search, details with episodes, streams | [AnimeSaturn](animesaturn.md) |
+| AnimeUnity | Italian-language anime: search, details with episodes, streams | [AnimeUnity](animeunity.md) |
 
-* `animepahe`
-* `animekai`
-* `toonstream`
+{% hint style="warning" %}
+On 2026-09-29 AnimeSaturn's site was down (the API returns `502`), and AnimeUnity only serves Italian IP addresses (from elsewhere the API returns `502`).
+{% endhint %}
 
-The root anime group is split by provider.
+## Anime index
 
-Each provider focuses on a slightly different use case:
+`GET /anime`
 
-* AnimePahe for search, latest episodes, and stream variants
-* Animekai for rich catalog browsing, schedules, and relations
-* ToonStream for home feeds, movie or series browsing, and proxy-backed playback
+Lists the providers and a one-line summary of each provider's routes.
 
-### Providers
+```bash
+curl "http://localhost:3000/anime"
+```
 
-#### AnimePahe
+```json
+{
+  "service": "anime",
+  "description": "Unified anime API — provider-isolated route architecture",
+  "providers": [
+    "animepahe",
+    "toonstream",
+    "animesaturn",
+    "animeunity",
+    "animelok",
+    "miruro",
+    "anivexa"
+  ],
+  "endpoints": {
+    "animepahe": [
+      "GET /anime/animepahe/search/:query         → Search titles",
+      "GET /anime/animepahe/latest                → Latest updated titles",
+      "GET /anime/animepahe/info/:id              → Full title details",
+      "GET /anime/animepahe/episodes/:id          → Episode list",
+      "GET /anime/animepahe/episode/:id/:session  → Stream results"
+    ]
+  }
+}
+```
 
-AnimePahe is a good fit when you need:
+Each provider also answers at its own root, for example `GET /anime/miruro`, with its route list.
 
-* rich search results
-* latest airing episodes
-* full episode lists
-* multiple stream variants per episode
+## Choosing a provider
 
-See [AnimePahe](animepahe.md) for the full route reference.
-
-#### Animekai
-
-Animekai is a good fit when you need:
-
-* spotlight and airing schedule data
-* browse by type and genre
-* recommendations and relations
-* server lists and intro or outro timing
-
-See [Animekai](animekai.md) for the full route reference.
-
-#### ToonStream
-
-ToonStream is a good fit when you need:
-
-* a home-style feed
-* movie and series browsing
-* direct source extraction
-* media proxy routes for playback
-
-See [ToonStream](toonstream.md) for the full route reference.
-
-### Typical integration
-
-1. Use Animekai or ToonStream for discovery-heavy experiences.
-2. Use AnimePahe when you want stronger episode and stream coverage.
-3. Pick the provider that best matches your UI flow.
-4. Mix providers if you want broader source coverage.
+* **Discovery and metadata:** Miruro. It covers search, autocomplete, filters, trending, popular, upcoming, the airing schedule, characters, relations and recommendations, all from AniList.
+* **Direct streams with sub and dub:** Miruro's `watch` route groups streams from several sites into sub, dub and soft-sub tracks. AnimePahe gives Japanese and English-dub HLS at three qualities plus MP4 download links.
+* **Already have an AniList id:** Miruro, Anivexa and Animelok take it directly. Animelok returns embed players for an `<iframe>`, not direct streams.
+* **Western cartoons and Indian-language dubs:** ToonStream.
+* **Italian-language anime:** AnimeUnity, from an Italian IP. AnimeSaturn when its site is back up.
+* **Browser playback:** use the `proxiedUrl` on AnimePahe, ToonStream and Miruro streams. It plays through the [stream proxy](../../core/proxy.md) with the headers the host needs.
+* **Speed:** AnimePahe's first request after a restart takes several seconds while a browser solves Cloudflare's challenge; later requests are fast. Miruro's AniList-backed routes share AniList's limit of about 30 requests per minute.
