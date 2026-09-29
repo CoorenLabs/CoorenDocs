@@ -1,7 +1,6 @@
 # Table of contents
 
 * [Welcome](README.md)
-* [Maintainers](maintainers.md)
 
 ## Getting Started
 
