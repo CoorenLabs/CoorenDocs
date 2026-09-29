@@ -1,34 +1,29 @@
 ---
+description: Music search, metadata, editorial pages and playback manifests.
 icon: music
 ---
 
 # Music
 
-## Music
-
-The music module currently exposes one provider: Tidal.
-
-Use it for music search, metadata, editorial pages, and playback manifest access.
+Music providers return tracks, albums, artists, playlists and editorial pages, plus playback manifests for previews and, with an account session, full-length streams.
 
 {% hint style="info" %}
-Base route: `GET /music/...`
+Base route: `/music`
 {% endhint %}
 
-### Overview
+## Providers
 
-Current providers:
+| Provider | Good for | Page |
+| --- | --- | --- |
+| Tidal | Search, full catalog metadata, home, charts and new-release pages, genres, moods, radio, 30-second previews and session-based full streams | [Tidal](tidal.md) |
 
-* `tidal`
+## Overview route
 
-The root route returns a small provider index.
+`GET /music` lists the providers and a few of their routes.
 
-#### Music root
-
-`GET /music/`
-
-Returns the music service overview and provider list.
-
-Example shape:
+```bash
+curl "http://localhost:3000/music"
+```
 
 ```json
 {
@@ -45,19 +40,7 @@ Example shape:
 }
 ```
 
-### Provider
+## Choosing a provider
 
-#### Tidal
-
-Tidal is the current music provider.
-
-It supports:
-
-* global search
-* track, album, artist, playlist, mix, and video metadata
-* recommendations and radio
-* editorial pages
-* genres and moods
-* playback manifest access
-
-See [Tidal](tidal.md) for the full route reference.
+* Tidal is the only music provider. It calls Tidal's API directly, so most routes answer in under a second.
+* Metadata, artwork and 30-second previews need no account. Full-length audio and video need a Tidal session id, sent as the `x-tidal-sessionid` header or the `sessionId` query parameter.

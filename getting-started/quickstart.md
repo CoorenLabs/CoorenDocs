@@ -1,45 +1,31 @@
 ---
-description: Get CoorenLabs on your machine fast. Then inspect the API and route groups.
+description: Install Cooren, run it locally and make your first requests.
 icon: bolt
 ---
 
 # Quickstart
 
-{% hint style="success" %}
-You should be ready to explore the API in a few minutes.
-{% endhint %}
-
-### Before you start
-
-This guide assumes you already know:
-
-* Git and the terminal
-* Environment variables
-* HTTP, REST, and JSON
-* Basic TypeScript workflows
-
-{% hint style="warning" %}
-Basic setup for Git, Bun, Node.js, editors, and general web concepts is out of scope here.
-{% endhint %}
+This page gets the API running on your machine in a few minutes. To run it in production, see [Deployment](deployment.md).
 
 ### Requirements
 
-Make sure you have:
+* [Git](https://git-scm.com)
+* [Bun](https://bun.sh/docs/installation) 1.4 or newer
+* Google Chrome or Chromium, for the providers that pass Cloudflare challenges in a real browser (AnimePahe, PrimeSrc, All Manga chapter pages, VidCore, VidFast and parts of Anivexa)
 
-* Git
-* [Bun](https://bun.sh/docs/installation)
-* A REST client like Postman, Insomnia, or Bruno
-* A TypeScript-friendly editor
+{% hint style="info" %}
+Prefer containers? `docker compose up -d --build` starts the API with Chromium and Redis already set up. See [Deployment](deployment.md#docker-compose).
+{% endhint %}
 
-### Get the code
+### Run the API
 
 {% stepper %}
 {% step %}
 #### Clone the repository
 
 ```bash
-git clone https://github.com/CoorenLabs/Cooren.git
-cd Cooren
+git clone https://github.com/CoorenLabs/CoorenLabs.git
+cd CoorenLabs
 ```
 {% endstep %}
 
@@ -52,92 +38,103 @@ bun install
 {% endstep %}
 
 {% step %}
-#### Start the API
+#### Create your environment file
 
-Run the Bun start command defined by the repository.
+```bash
+cp .env.example .env
+```
 
-Once the server is up, continue with the checks below.
+The defaults work for local development. See [Configuration](configuration.md) for every variable.
 {% endstep %}
 
 {% step %}
-#### Open the API docs
+#### Start the server
 
-Visit:
-
-```
-http://localhost:<port>/docs
+```bash
+bun run dev
 ```
 
-This is the fastest way to inspect available endpoints.
+`dev` restarts the server when you change a file. Use `bun run start` to run it without watching.
 {% endstep %}
 {% endstepper %}
 
-### Verify the server
+### Check that it works
 
-Check the root endpoint first:
+The root route returns the API status:
 
 ```bash
-curl http://localhost:<port>/
+curl "http://localhost:3000/"
 ```
 
-You should get a JSON response with status or metadata.
+```json
+{
+  "name": "Cooren API",
+  "version": "3.0.0",
+  "repo": "https://github.com/CoorenLabs/CoorenLabs.git",
+  "environment": "development",
+  "about": "Cooren is a high-performance, scalable scraping engine designed to collect, organize, and deliver structured data from across the world of anime, movies, manga, and music, all in one unified ecosystem",
+  "status": "operational"
+}
+```
 
-Then open:
+Then open [http://localhost:3000/docs](http://localhost:3000/docs) for the interactive OpenAPI reference. The raw spec is at `/docs/json`.
 
-* `/docs` for the OpenAPI UI
-* `/` for the base metadata response
+### Make a first request
+
+Search AniList through the meta provider:
+
+```bash
+curl "http://localhost:3000/meta/anilist/search/frieren"
+```
+
+Each category also has an overview route that lists its providers and their endpoints:
+
+```bash
+curl "http://localhost:3000/anime/"
+```
+
+```json
+{
+  "service": "anime",
+  "description": "Unified anime API — provider-isolated route architecture",
+  "providers": ["animepahe", "toonstream", "animesaturn", "animeunity", "animelok", "miruro", "anivexa"],
+  "endpoints": {
+    "animepahe": [
+      "GET /anime/animepahe/search/:query         → Search titles"
+    ]
+  }
+}
+```
 
 ### Route groups
 
-Cooren mounts providers under a few top-level prefixes:
+| Prefix | Purpose |
+| --- | --- |
+| `/anime` | Anime providers |
+| `/manga` | Manga providers |
+| `/meta` | Metadata and discovery (AniList) |
+| `/movie-tv` | Movie and TV providers |
+| `/stream` | Direct stream extractors for movies and TV |
+| `/music` | Music providers |
+| `/proxy` | [Stream proxy](../core/proxy.md) for HLS, MP4 and files |
+| `/mappings` | [ID mappings](../core/mappings.md) between anime databases |
+| `/docs` | OpenAPI reference |
 
-* `/anime`
-* `/manga`
-* `/movie-tv`
-* `/music`
+### Project layout
 
-If the server is running, those groups should appear in the API docs.
+| Path | Contents |
+| --- | --- |
+| `src/index.ts` | Starts the server |
+| `src/app.ts` | Builds the Elysia app: CORS, OpenAPI docs and every route group |
+| `src/core` | Configuration, logging, Redis cache, the stream proxy, ID mappings, and the Cloudflare, browser and TLS helpers in `src/core/lib` |
+| `src/providers/<category>/<provider>` | One folder per provider with its routes, scraper and types |
+| `src/providers/origins.ts` | The base URL of every upstream site |
 
-### How the project is organized
+### Useful scripts
 
-The codebase is split into three main areas:
-
-* `src/core`\
-  Config, logging, cache, helpers, and route mapping
-* `src/providers`\
-  Provider implementations grouped by category
-* `src/index.ts`\
-  App setup, CORS, path normalization, and route registration
-
-### What happens on startup
-
-When Cooren boots, it:
-
-1. Validates configuration
-2. Configures CORS and request handling
-3. Registers provider routes
-4. Exposes `/docs`
-5. Exposes `/`
-
-<details>
-
-<summary>Need deeper background?</summary>
-
-Use the official docs for core dependencies:
-
-* [Bun](https://bun.sh/docs)
-* [TypeScript](https://www.typescriptlang.org/docs)
-* [Node.js](https://nodejs.org/en/docs)
-* [Elysia](https://elysiajs.com/docs)
-* [Elysia CORS](https://elysiajs.com/plugins/cors)
-* [Elysia OpenAPI](https://elysiajs.com/plugins/openapi)
-* [Axios](https://axios-http.com/docs/intro)
-* [Cheerio](https://cheerio.js.org/)
-* [Zod](https://zod.dev/)
-* [Upstash Redis](https://upstash.com/docs/redis)
-
-</details>
-
-### Next step
-
-Once the API is running, open `/docs` and test one provider route end to end.
+| Command | What it does |
+| --- | --- |
+| `bun run dev` | Start the server and restart on file changes |
+| `bun run start` | Start the server |
+| `bun run typecheck` | Type-check the project |
+| `bun run lint` | Lint the project |

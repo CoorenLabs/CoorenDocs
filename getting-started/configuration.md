@@ -1,186 +1,64 @@
 ---
+description: Every environment variable Cooren reads, with defaults.
 icon: sliders
 ---
 
 # Configuration
 
-## Configuration
+Cooren is configured with environment variables. Copy `.env.example` to `.env` to start; every variable is optional in development.
 
-Cooren reads its configuration from environment variables and core config files.
+### Variables
 
-{% hint style="info" %}
-Start with the example below. Then check `config.ts` for the full list and defaults.
-{% endhint %}
-
-### Key variables
-
-These are the settings you will most likely change first:
-
-* `PORT`\
-  HTTP port for the API
-* `NODE_ENV`\
-  Runtime mode like `development` or `production`
-* `SERVER_ORIGIN`\
-  Public server origin used for domain masking
-* `CORS_ORIGIN`\
-  Allowed origins for CORS
-* `CORS_CREDENTIALS`\
-  Enables or disables credential support
-* `LOG_LEVEL`\
-  Logging verbosity
-* `ENABLE_CACHE`\
-  Enables Redis-backed caching
-* `ENABLE_RATE_LIMITING`\
-  Enables request rate limiting
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PORT` | `3000` | Port the server listens on. |
+| `NODE_ENV` | `development` | `development` or `production`. Shown on the `/` route. |
+| `SERVER_ORIGIN` | `http://localhost:PORT` | Public URL of this API. Every proxied stream, subtitle and image link in a response is built from it. Required when `NODE_ENV` is `production`. |
+| `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` or `silent`. |
+| `CORS_ORIGIN` | `*` | `*` allows every origin. Otherwise a comma-separated list of allowed origins. |
+| `CORS_CREDENTIALS` | `false` | Set to `true` to allow cookies on cross-origin requests. |
+| `REDIS_URL` | not set | Redis connection URL, for example `redis://localhost:6379`. Turns caching on. |
 
 ### Example `.env`
 
-Use this as your base config:
-
-```dotenv
-REPO=https://github.com/CoorenLabs/Cooren
-
-# Server Configuration
+```bash
 PORT=3000
 NODE_ENV=development
-
-# Domain Masking Configuration
-# Set this to your actual domain in production (e.g. api.yoursite.com)
-SERVER_ORIGIN=http://localhost:3000
-
-# Logging Configuration
 LOG_LEVEL=info
-
-# Rate Limiting (requests per minute)
-RATE_LIMIT_PER_MINUTE=100
-
-# Proxy Configuration
-PROXY_TIMEOUT_MS=30000
-PROXY_MAX_RETRIES=3
-SHOW_PROXIED_URL=true
-
-# CORS Configuration
+SERVER_ORIGIN=http://localhost:3000
 CORS_ORIGIN=*
 CORS_CREDENTIALS=false
-
-# OpenAPI Configuration
-OPENAPI_ENABLED=true
-OPENAPI_VERSION=3.0.0
-
-# Cache Config
-ENABLE_CACHE=false # set `true` to enable redis cache
-DEFAULT_CACHE_TTL="-1" # cache TTL in seconds, for storing forever set to "-1"
-CACHE_PROVIDER=default # `default` or `uptash`
-
-# default
-REDIS_URL=redis://localhost:6379
-
-# uptash
-UPSTASH_REDIS_REST_URL=
-UPSTASH_REDIS_REST_TOKEN=
-
-# =============================================================================
-# PRODUCTION SETTINGS (Uncomment for production)
-# =============================================================================
-
-# NODE_ENV=production
-# LOG_LEVEL=warn
-# CORS_ORIGIN=https://yoursite.com,https://api.yoursite.com
-# CORS_CREDENTIALS=true
-# RATE_LIMIT_PER_MINUTE=60
-
-# =============================================================================
-# DEVELOPMENT SETTINGS
-# =============================================================================
-
-# Enable detailed logging in development
-# LOG_LEVEL=debug
-
-# =============================================================================
-# SECURITY SETTINGS
-# =============================================================================
-
-# API Rate Limiting
-ENABLE_RATE_LIMITING=false
-
-# Request timeout (milliseconds)
-REQUEST_TIMEOUT=60000
+REDIS_URL=
 ```
 
+### SERVER\_ORIGIN
+
+Stream links in responses point back at your own server, for example `http://localhost:3000/proxy/m3u8-proxy?url=...`. Set `SERVER_ORIGIN` to the exact URL clients use to reach the API, including the scheme and any port, and without a trailing slash.
+
 {% hint style="warning" %}
-Adjust these values for local, staging, and production separately.
+If `SERVER_ORIGIN` is wrong, search and details still work but every `proxiedUrl` and image link points at the wrong host.
 {% endhint %}
 
-### Configuration groups
+In production the server refuses to start without it:
 
-#### Server
+```
+Error: SERVER_ORIGIN must be set in production
+```
 
-* `PORT`
-* `NODE_ENV`
-* `SERVER_ORIGIN`
+### Caching
 
-These control runtime mode and server identity.
+Without `REDIS_URL` every request goes to the upstream site. With it, provider results are cached for minutes to days depending on how often the data changes, for example 10 minutes for MangaBall details and 24 hours for ID mappings. Caching makes repeat requests fast and keeps you under upstream rate limits, such as AniList's.
 
-#### Logging
+* Caching needs the Bun runtime.
+* If Redis is unreachable at startup, the server logs a warning and runs without a cache.
+* Cloudflare clearance cookies are cached too, so a browser solve is shared between requests.
 
-* `LOG_LEVEL`
+### Browser providers
 
-Use `debug` in development. Use `warn` or stricter in production.
+Some providers solve Cloudflare challenges in a real Chrome window, controlled by `puppeteer-real-browser`. Chrome is found automatically. Set `CHROME_PATH` to use a specific Chrome or Chromium binary; the Docker image sets it to `/usr/bin/chromium`. On Linux servers without a display, the browser runs inside Xvfb, which the Docker image installs.
 
-#### Rate limiting and timeouts
+### CORS
 
-* `RATE_LIMIT_PER_MINUTE`
-* `ENABLE_RATE_LIMITING`
-* `REQUEST_TIMEOUT`
-* `PROXY_TIMEOUT_MS`
-* `PROXY_MAX_RETRIES`
-
-These control request volume, retries, and timeout behavior.
-
-#### CORS
-
-* `CORS_ORIGIN`
-* `CORS_CREDENTIALS`
-
-Cooren uses `@elysiajs/cors` with this behavior:
-
-* If `CORS_ORIGIN` is `*`, all origins are allowed
-* Otherwise, `CORS_ORIGIN` is split by commas and used as an allowlist
-* `CORS_CREDENTIALS` controls whether credentials are allowed
-
-#### OpenAPI
-
-* `OPENAPI_ENABLED`
-* `OPENAPI_VERSION`
-
-These control whether the API docs are exposed and which spec version is used.
-
-#### Cache
-
-* `ENABLE_CACHE`
-* `DEFAULT_CACHE_TTL`
-* `CACHE_PROVIDER`
-* `REDIS_URL`
-* `UPSTASH_REDIS_REST_URL`
-* `UPSTASH_REDIS_REST_TOKEN`
-
-Use `default` for a standard Redis connection.
-
-Use Upstash variables when the cache provider is configured for Upstash.
-
-#### Proxy behavior
-
-* `SHOW_PROXIED_URL`
-
-This controls whether proxied URLs are exposed in responses or logs.
-
-### Reference docs
-
-Use these if you need deeper details:
-
-* [Elysia CORS docs](https://elysiajs.com/plugins/cors)
-* [MDN CORS docs](https://developer.mozilla.org/docs/Web/HTTP/CORS)
-
-### Full config reference
-
-For the full list of supported variables and defaults, check the source in `config.ts`.
+* `CORS_ORIGIN=*` reflects any origin.
+* `CORS_ORIGIN=https://app.example.com,https://admin.example.com` allows only those origins.
+* `CORS_CREDENTIALS=true` adds `Access-Control-Allow-Credentials: true`. Use it with an explicit origin list, not `*`.

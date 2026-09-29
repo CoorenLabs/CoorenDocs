@@ -1,201 +1,202 @@
 ---
+description: Browse ToonStream's cartoons and anime, including Hindi, Tamil and Telugu dubs, and get HLS sources for movies and episodes.
 icon: bolt
 ---
 
 # ToonStream
 
-## ToonStream
-
-ToonStream exposes home, search, browse, detail, source, and media proxy endpoints.
-
-Use it when you need a richer home layout, movie and series catalogs, and proxied playback support.
+ToonStream scrapes [toonstream.us](https://toonstream.us), a catalog of anime and Western cartoons with many Hindi, Tamil, Telugu and English dubs. It covers the home page, search, paged movie and series listings, details with every season and episode, and playable sources. Sources are resolved from the site's embedded players into HLS links, each with a `proxiedUrl` that plays through the API's [stream proxy](../../core/proxy.md).
 
 {% hint style="info" %}
-Base route: `GET /anime/toonstream/...`
+Base route: `/anime/toonstream`
 {% endhint %}
 
-### Overview
+## Routes
 
-ToonStream supports:
+| Route | Description |
+| --- | --- |
+| `GET /anime/toonstream` | Lists the provider's routes |
+| `GET /anime/toonstream/home` | Home page sections and latest episodes |
+| `GET /anime/toonstream/search/:query/:page?` | Search movies and series |
+| `GET /anime/toonstream/movies/:page?` | Browse movies |
+| `GET /anime/toonstream/movies/info/:slug` | Movie details |
+| `GET /anime/toonstream/movies/sources/:slug` | Movie sources |
+| `GET /anime/toonstream/series/:page?` | Browse series |
+| `GET /anime/toonstream/series/info/:slug` | Series details with seasons and episodes |
+| `GET /anime/toonstream/episode/sources/:slug` | Episode sources |
 
-* home page snapshots
-* search across movies and series
-* paged movie listings
-* paged series listings
-* movie metadata
-* series metadata with seasons and episodes
-* direct player source extraction
-* HLS, TS, MP4, and generic media proxying
+### Response format
 
-Most responses include a shared envelope:
-
-```ts
-type TResponse = {
-  success: boolean;
-  msg?: string;
-  served_cache?: boolean;
-  took_ms: number;
-};
-```
-
-Common item shapes:
-
-```ts
-type AnimeCard = {
-  type: "movie" | "series";
-  slug: string;
-  title: string;
-  url: string;
-  poster: string;
-  tmdbRating: number;
-};
-
-type Episode = {
-  episode_no: number;
-  slug: string;
-  title: string;
-  epXseason: string;
-  url: string;
-  thumbnail: string;
-  ago?: string;
-};
-
-type DirectSource = {
-  label?: string;
-  type: "hls" | "mp4";
-  url: string;
-  cover?: string;
-  thumbnail?: string;
-  subtitles?: {
-    label: string;
-    flag?: string;
-    url: string;
-  };
-  headers?: Record<string, string>;
-  proxiedUrl?: string;
-};
-```
-
-### Root index
-
-#### API index
-
-`GET /anime/toonstream/`
-
-Returns a small index of ToonStream routes, plus a note about proxy usage.
-
-Use it for:
-
-* quick route discovery
-* sanity checks during setup
-* confirming proxy routes are available
-
-### Home
-
-#### Home snapshot
-
-`GET /anime/toonstream/home`
-
-Returns the scraped home page structure.
-
-The payload includes:
-
-* `main` sections
-* `sidebar` sections
-* `lastEpisodes`
-
-Example shape:
+Every route except the index wraps its result:
 
 ```json
 {
   "success": true,
   "served_cache": false,
-  "took_ms": "12.34",
+  "took_ms": "518.95",
+  "data": {}
+}
+```
+
+* `served_cache` is `true` when the result came from Redis. The two sources routes do not include it.
+* `took_ms` is a string. The episode sources route does not include it.
+* The listing routes (`movies`, `series`) also include `page`.
+
+When nothing could be scraped, for example an unknown slug, the route still answers `200`:
+
+```json
+{
+  "success": false,
+  "took_ms": "575.44",
+  "msg": "No Data Scraped!"
+}
+```
+
+Check `success` rather than the status code.
+
+## Overview
+
+### Provider index
+
+`GET /anime/toonstream`
+
+**Example**
+
+```bash
+curl "http://localhost:3000/anime/toonstream"
+```
+
+```json
+{
+  "name": "toonstream-api",
+  "version": "0.1",
+  "endpoints": [
+    "/anime/toonstream/home",
+    "/anime/toonstream/search/{query}/{page}",
+    "----------------------",
+    "/anime/toonstream/movies/{page}",
+    "/anime/toonstream/movies/info/{slug}",
+    "/anime/toonstream/movies/sources/{slug}",
+    "----------------------",
+    "/anime/toonstream/series/{page}",
+    "/anime/toonstream/series/info/{slug}",
+    "/anime/toonstream/episode/sources/{slug}?season={season}&episode={episode}"
+  ]
+}
+```
+
+### Home
+
+`GET /anime/toonstream/home`
+
+Returns the home page sections (`main`), the sidebar sections (`sidebar`) and the latest episodes (`lastEpisodes`). Each section has a `label`, a list of cards and, when the site links one, a `viewMore` URL.
+
+**Example**
+
+```bash
+curl "http://localhost:3000/anime/toonstream/home"
+```
+
+```json
+{
+  "success": true,
+  "served_cache": false,
+  "took_ms": "730.61",
   "data": {
     "main": [
       {
-        "label": "Latest Movies",
-        "viewMore": "https://toonstream.../movies/",
-        "data": [
-          {
-            "type": "movie",
-            "slug": "some-movie-slug",
-            "title": "Movie Title",
-            "url": "https://toonstream.../movies/some-movie-slug/",
-            "poster": "https://...jpg",
-            "tmdbRating": 7.8
-          }
-        ]
-      }
-    ],
-    "sidebar": [
-      {
-        "label": "Top Rated",
+        "label": "Random series",
         "data": [
           {
             "type": "series",
-            "slug": "some-series-slug",
-            "title": "Series Title",
-            "url": "https://toonstream.../series/some-series-slug/",
-            "poster": "https://...jpg",
-            "tmdbRating": 8.4
+            "title": "Iron Man",
+            "slug": "iron-man",
+            "poster": "https://image.tmdb.org/t/p/w780/zOTJT7JbzSrMBX2OCGPqUnkQA4y.jpg",
+            "url": "https://toonstream.us/series/iron-man",
+            "tmdbRating": 7.2
+          }
+        ]
+      },
+      {
+        "label": "Anime Series",
+        "viewMore": "https://toonstream.us/category/anime-series",
+        "data": [
+          {
+            "type": "series",
+            "title": "LIAR GAME",
+            "slug": "liar-game",
+            "poster": "https://image.tmdb.org/t/p/w780/9npgB8fyf7qN8F4ngkuY2eHczxD.jpg",
+            "url": "https://toonstream.us/series/liar-game",
+            "tmdbRating": 9
           }
         ]
       }
     ],
+    "sidebar": [],
     "lastEpisodes": [
       {
-        "slug": "episode-slug",
-        "title": "Episode Title",
-        "epXseason": "S01E03",
-        "url": "https://toonstream.../episode/episode-slug/",
-        "thumbnail": "https://...jpg",
-        "ago": "2 hours ago"
+        "title": "LIAR GAME",
+        "slug": "liar-game-1x23",
+        "url": "https://toonstream.us/episode/liar-game-1x23/",
+        "epXseason": "1x23",
+        "ago": "",
+        "thumbnail": "https://image.tmdb.org/t/p/w780/9npgB8fyf7qN8F4ngkuY2eHczxD.jpg"
       }
     ]
   }
 }
 ```
 
-**Caching**
+In testing the home page had six `main` sections (Random series, Anime Series, Animated Series, Anime Movies, Animated Movies, Random Movies) of 18 cards each, an empty `sidebar`, and 18 `lastEpisodes`. `ago` was always an empty string. A `lastEpisodes` slug goes straight into [Episode sources](#episode-sources).
 
-* cache key: `home`
-* TTL: 12 hours
+## Search
 
-### Search
-
-#### Search movies and series
+### Search movies and series
 
 `GET /anime/toonstream/search/:query/:page?`
 
-Searches ToonStream content with pagination.
+Returns matching movie and series cards. `type` tells you which info route to call next.
 
-**Params**
+**Path parameters**
 
-* `query` required
-* `page` optional. Default is `1`
+| Name | Required | Description |
+| --- | --- | --- |
+| `query` | Yes | Search text, URL-encoded |
+| `page` | No | Page number, an integer of at least `1`. Defaults to `1` |
 
-Example shape:
+**Example**
+
+```bash
+curl "http://localhost:3000/anime/toonstream/search/naruto"
+```
 
 ```json
 {
   "success": true,
   "served_cache": false,
-  "took_ms": "55.00",
+  "took_ms": "518.95",
   "data": {
     "query": "naruto",
     "pagination": {
       "current": 1,
       "start": 1,
-      "end": 5
+      "end": 1
     },
     "data": [
       {
+        "type": "movie",
+        "title": "Naruto Shippuden the Movie",
+        "slug": "naruto-shippuden-the-movie",
+        "poster": "https://image.tmdb.org/t/p/w780/vDkct38sSFSWJIATlfJw0l3QOIR.jpg",
+        "url": "https://toonstream.us/movies/naruto-shippuden-the-movie",
+        "tmdbRating": 7.4
+      },
+      {
         "type": "series",
-        "slug": "naruto",
         "title": "Naruto",
-        "url": "https://toonstream.../series/naruto/",
-        "poster": "https://...jpg",
+        "slug": "naruto",
+        "poster": "https://image.tmdb.org/t/p/w780/vauCEnR7CiyBDzRCeElKkCaXIYu.jpg",
+        "url": "https://toonstream.us/series/naruto",
         "tmdbRating": 8.3
       }
     ]
@@ -203,214 +204,261 @@ Example shape:
 }
 ```
 
-**Notes**
+`pagination.end` is the last page. A search with no matches, or a page past the end, returns `success: true` with an empty `data` array.
 
-* Spaces in the query are converted to `+`.
-* Search results are cached by `query` and `page`.
-* Cache TTL is 12 hours.
+## Movies
 
-### Movies
-
-#### Movie listing
+### Browse movies
 
 `GET /anime/toonstream/movies/:page?`
 
-Returns a paged list of movie cards.
+Returns one page of movie cards, 12 per page, in the site's order.
 
-**Params**
+**Path parameters**
 
-* `page` optional. Default is `1`
+| Name | Required | Description |
+| --- | --- | --- |
+| `page` | No | Page number, an integer of at least `1`. Defaults to `1` |
 
-Example shape:
+**Example**
+
+```bash
+curl "http://localhost:3000/anime/toonstream/movies/2"
+```
+
+```json
+{
+  "success": true,
+  "served_cache": false,
+  "page": 2,
+  "took_ms": "543.23",
+  "data": {
+    "pagination": {
+      "current": 2,
+      "start": 1,
+      "end": 35
+    },
+    "data": [
+      {
+        "type": "movie",
+        "title": "Hotel Transylvania 4: Transformania",
+        "slug": "hotel-transylvania-transformania",
+        "poster": "https://image.tmdb.org/t/p/w780/teCy1egGQa0y8ULJvlrDHQKnxBL.jpg",
+        "url": "https://toonstream.us/movies/hotel-transylvania-transformania",
+        "tmdbRating": 7
+      }
+    ]
+  }
+}
+```
+
+### Movie info
+
+`GET /anime/toonstream/movies/info/:slug`
+
+Returns a movie's details. `casts` holds both directors and voice cast, told apart by their URL (`/director/` or `/cast/`).
+
+**Path parameters**
+
+| Name | Required | Description |
+| --- | --- | --- |
+| `slug` | Yes | Movie slug from search, home or the movie listing |
+
+**Example**
+
+```bash
+curl "http://localhost:3000/anime/toonstream/movies/info/the-last-naruto-the-movie"
+```
+
+```json
+{
+  "success": true,
+  "served_cache": false,
+  "took_ms": "607.12",
+  "data": {
+    "title": "The Last: Naruto the Movie",
+    "year": "2014",
+    "tmdbRating": 7.7,
+    "description": "Two years after the events of the Fourth Great Ninja War, the moon that Hagoromo Otsutsuki created long ago to seal away the Gedo Statue begins to descend towards the world...",
+    "languages": ["Hindi [Fan Dub]", "English", "Japanese"],
+    "qualities": ["1080p FHD", "720p HD", "480p"],
+    "duration": "1h 52m",
+    "genres": [
+      {
+        "name": "Action",
+        "url": "https://toonstream.us/category/action/",
+        "slug": "action"
+      }
+    ],
+    "tags": [
+      {
+        "name": "The Last: Naruto the Movie",
+        "url": "https://toonstream.us/tag/the-last-naruto-the-movie/"
+      }
+    ],
+    "casts": [
+      {
+        "name": "Hirofumi Masuda",
+        "url": "https://toonstream.us/director/hirofumi-masuda/"
+      },
+      {
+        "name": "Akira Ishida",
+        "url": "https://toonstream.us/cast/akira-ishida/"
+      }
+    ]
+  }
+}
+```
+
+### Movie sources
+
+`GET /anime/toonstream/movies/sources/:slug`
+
+Returns every embedded player on the movie page (`embeds`) and the ones the API could turn into direct streams (`sources`). See [Source fields](#source-fields).
+
+**Path parameters**
+
+| Name | Required | Description |
+| --- | --- | --- |
+| `slug` | Yes | Movie slug |
+
+**Example**
+
+```bash
+curl "http://localhost:3000/anime/toonstream/movies/sources/death-note-relight-2-ls-successors"
+```
+
+```json
+{
+  "success": true,
+  "took_ms": "2891.69",
+  "data": {
+    "embeds": [
+      "https://rubystm.com/e/cemnmsgo7cig.html",
+      "https://filesforever.link/embed/fz3yf7g",
+      "https://cloudy.upns.one/#bsfbiz",
+      "https://vidmoly.net/embed-q433cwq8wzis.html",
+      "https://abyssplayer.com/-H6kB6B-f",
+      "https://as-cdn26.top/video/23f8361e3b539eb12866b699f4da27dd",
+      "https://turbonewvid.com/t/6aa594fe86626"
+    ],
+    "sources": [
+      {
+        "label": "Ruby",
+        "type": "hls",
+        "url": "https://ozovxg2t3b2c8m8g.streamruby.net/hls2/04/00492/cemnmsgo7cig_,l,n,h,x,.urlset/master.m3u8?t=AahXQ809vwE8Y4za6rBLWedzpgYQactvxFtjOA-Y1hA&s=1790686137&e=32400&v=1871233949&i=103.41&sp=0&fr=cemnmsgo7cig",
+        "cover": "https://img.streamruby.com//cemnmsgo7cig_xt.jpg",
+        "thumbnail": "https://ozovxg2t3b2c8m8g.streamruby.net/vtt/04/00492/cemnmsgo7cig_sli.vtt",
+        "subtitles": {
+          "label": "English",
+          "url": "https://ozovxg2t3b2c8m8g.streamruby.net/vtt/04/00492/cemnmsgo7cig_eng.vtt"
+        },
+        "headers": {
+          "Origin": "https://rubystm.com",
+          "Referer": "https://rubystm.com/"
+        },
+        "proxiedUrl": "http://localhost:3000/proxy/m3u8-proxy?url=https%3A%2F%2Fozovxg2t3b2c8m8g.streamruby.net%2Fhls2%2F04%2F00492%2Fcemnmsgo7cig_%2Cl%2Cn%2Ch%2Cx%2C.urlset%2Fmaster.m3u8%3Ft%3DAahXQ809vwE8Y4za6rBLWedzpgYQactvxFtjOA-Y1hA%26s%3D1790686137%26e%3D32400%26v%3D1871233949%26i%3D103.41%26sp%3D0%26fr%3Dcemnmsgo7cig&headers=%7B%22Origin%22%3A%22https%3A%2F%2Frubystm.com%22%2C%22Referer%22%3A%22https%3A%2F%2Frubystm.com%2F%22%7D"
+      }
+    ]
+  }
+}
+```
+
+Some movies only have players the API cannot resolve. For example `the-last-naruto-the-movie` returned five `embeds` and an empty `sources` array.
+
+## Series
+
+### Browse series
+
+`GET /anime/toonstream/series/:page?`
+
+Returns one page of series cards, 12 per page. The response has the same shape as [Browse movies](#browse-movies), with `type: "series"`.
+
+**Path parameters**
+
+| Name | Required | Description |
+| --- | --- | --- |
+| `page` | No | Page number, an integer of at least `1`. Defaults to `1` |
+
+**Example**
+
+```bash
+curl "http://localhost:3000/anime/toonstream/series"
+```
 
 ```json
 {
   "success": true,
   "served_cache": false,
   "page": 1,
-  "took_ms": "23.12",
+  "took_ms": "618.33",
   "data": {
     "pagination": {
       "current": 1,
       "start": 1,
-      "end": 10
+      "end": 49
     },
     "data": [
       {
-        "type": "movie",
-        "slug": "some-movie",
-        "title": "Some Movie",
-        "url": "https://toonstream.../movies/some-movie/",
-        "poster": "https://...jpg",
-        "tmdbRating": 7.5
+        "type": "series",
+        "title": "LIAR GAME",
+        "slug": "liar-game",
+        "poster": "https://image.tmdb.org/t/p/w780/9npgB8fyf7qN8F4ngkuY2eHczxD.jpg",
+        "url": "https://toonstream.us/series/liar-game",
+        "tmdbRating": 9
       }
     ]
   }
 }
 ```
 
-**Caching**
-
-* cache key: `movies:{page}`
-* TTL: 30 days
-
-#### Movie info
-
-`GET /anime/toonstream/movie/info/:slug`
-
-Returns metadata for one movie.
-
-**Params**
-
-* `slug` required
-
-Example shape:
-
-```json
-{
-  "success": true,
-  "served_cache": false,
-  "took_ms": "18.25",
-  "data": {
-    "title": "Movie Title",
-    "year": "2023",
-    "tmdbRating": 7.8,
-    "description": "Full movie description or synopsis.",
-    "languages": ["English", "Japanese"],
-    "qualities": ["1080p", "720p"],
-    "duration": "1h 45min",
-    "genres": [
-      { "name": "Action", "slug": "action", "url": "https://toonstream.../genre/action/" }
-    ],
-    "tags": [
-      { "name": "Shonen", "url": "https://toonstream.../tag/shonen/" }
-    ],
-    "casts": [
-      { "name": "Some Actor", "url": "https://toonstream.../cast/some-actor/" }
-    ]
-  }
-}
-```
-
-**Error behavior**
-
-If scraping fails, the route returns:
-
-* `success: false`
-* `msg: "No Data Scraped!"`
-
-**Caching**
-
-* cache key: `movie:info:{slug}`
-* TTL: 14 days
-
-#### Movie sources
-
-`GET /anime/toonstream/movie/sources/:slug`
-
-Resolves movie embeds into direct sources and embed URLs.
-
-**Params**
-
-* `slug` required
-
-Example shape:
-
-```json
-{
-  "success": true,
-  "took_ms": "40.01",
-  "data": {
-    "embeds": [
-      "https://toonstream.../embed/ascdn/...",
-      "https://toonstream.../embed/rubystm/..."
-    ],
-    "sources": [
-      {
-        "label": "1080p",
-        "type": "hls",
-        "url": "https://ascdn.../playlist.m3u8",
-        "cover": "https://...jpg",
-        "thumbnail": "https://...jpg",
-        "subtitles": [
-          { "label": "EN", "flag": "us", "url": "https://...vtt" }
-        ],
-        "headers": { "Referer": "https://..." },
-        "proxiedUrl": "https://your-server.../anime/toonstream/m3u8-proxy?url=..."
-      }
-    ]
-  }
-}
-```
-
-**How it works**
-
-1. Loads the movie page.
-2. Scrapes ToonStream iframe URLs.
-3. Follows those URLs to player iframes.
-4. Extracts supported sources from AS-CDN or RubyStream.
-5. Optionally rewrites source URLs to proxy routes.
-
-**Caching**
-
-* iframe cache key: `movie:iframes:{slug}`
-* direct sources are also cached internally by source URL
-
-### Series
-
-#### Series listing
-
-`GET /anime/toonstream/series/:page?`
-
-Returns a paged list of series cards.
-
-**Params**
-
-* `page` optional. Default is `1`
-
-The response shape matches the movie listing, but items use `type: "series"`.
-
-**Caching**
-
-* cache key: `series:{page}`
-* TTL: 30 days
-
-#### Series info
+### Series info
 
 `GET /anime/toonstream/series/info/:slug`
 
-Returns metadata for one series, including seasons and episodes.
+Returns a series' details and every season with its episodes. Each episode `slug` is what [Episode sources](#episode-sources) takes. `runtime` is the episode length.
 
-**Params**
+**Path parameters**
 
-* `slug` required
+| Name | Required | Description |
+| --- | --- | --- |
+| `slug` | Yes | Series slug from search, home or the series listing |
 
-Example shape:
+**Example**
+
+```bash
+curl "http://localhost:3000/anime/toonstream/series/info/grand-blue-dreaming"
+```
 
 ```json
 {
   "success": true,
   "served_cache": false,
-  "took_ms": "60.50",
+  "took_ms": "915.24",
   "data": {
-    "title": "Series Title",
-    "year": "2022",
-    "tmdbRating": 8.4,
-    "totalSeasons": 3,
-    "totalEpisodes": 24,
-    "description": "Series synopsis...",
-    "languages": ["English", "Japanese"],
-    "qualities": ["1080p", "720p"],
-    "runtime": "24 min per ep",
+    "title": "Grand Blue Dreaming",
+    "year": "2018",
+    "tmdbRating": 7.8,
+    "description": "A college student joins the local diving club after meeting some rowdy upperclassmen. New adventures in booze and the ocean await.",
+    "languages": ["Hindi", "Japanese"],
+    "qualities": ["1080p FHD", "720p HD", "480p"],
+    "runtime": "24min",
     "genres": [
-      { "name": "Action", "slug": "action", "url": "https://..." }
+      {
+        "name": "Animation",
+        "url": "https://toonstream.us/category/animation/",
+        "slug": "animation"
+      }
     ],
     "tags": [
-      { "name": "Shonen", "url": "https://..." }
+      {
+        "name": "Grand Blue Dreaming",
+        "url": "https://toonstream.us/tag/grand-blue-dreaming/"
+      }
     ],
-    "casts": [
-      { "name": "Some Actor", "url": "https://..." }
-    ],
+    "casts": [],
+    "totalSeasons": 3,
+    "totalEpisodes": 29,
     "seasons": [
       {
         "label": "Season 1",
@@ -418,11 +466,25 @@ Example shape:
         "episodes": [
           {
             "episode_no": 1,
-            "slug": "series-s1e1",
-            "title": "Episode 1",
-            "epXseason": "S01E01",
-            "url": "https://toonstream.../episode/series-s1e1/",
-            "thumbnail": "https://...jpg"
+            "slug": "grand-blue-dreaming-1x1",
+            "title": "S 1 | E 1",
+            "epXseason": "1x1",
+            "url": "https://toonstream.us/episode/grand-blue-dreaming-1x1/",
+            "thumbnail": "https://image.tmdb.org/t/p/w780/81SzeqvZXXQDfHgQ6i0efTz5WAS.jpg"
+          }
+        ]
+      },
+      {
+        "label": "Season 2",
+        "season_no": 2,
+        "episodes": [
+          {
+            "episode_no": 1,
+            "slug": "grand-blue-dreaming-2x1",
+            "title": "S 2 | E 1",
+            "epXseason": "2x1",
+            "url": "https://toonstream.us/episode/grand-blue-dreaming-2x1/",
+            "thumbnail": "https://image.tmdb.org/t/p/w780/1RdR5KOTpeFWdfFc3tpgeviu4zM.jpg"
           }
         ]
       }
@@ -431,159 +493,112 @@ Example shape:
 }
 ```
 
-**Implementation notes**
-
-* Scrapes the main series page for metadata.
-* Derives a `postId` from the page body classes.
-* Loads each season through an internal AJAX endpoint.
-* Builds `seasons` and `episodes` from the returned HTML.
-
-**Caching**
-
-* cache key: `series:info:{slug}`
-* TTL: 3 days
-
-#### Episode sources
+### Episode sources
 
 `GET /anime/toonstream/episode/sources/:slug`
 
-Resolves a series episode into embed URLs and direct sources.
+Returns the embedded players and resolved sources for one episode. Pass either the full episode slug (`grand-blue-dreaming-2x1`), or the series slug with `season` and `episode`; the API then builds `<slug>-<season>x<episode>`. Both query parameters must be present to be used.
 
-**Params**
+`hash` is the AS-CDN video id found among the embeds, or `null` when there is no AS-CDN player.
 
-* `slug` required
+**Path parameters**
 
-The behavior matches movie source extraction:
+| Name | Required | Description |
+| --- | --- | --- |
+| `slug` | Yes | Episode slug from series info or home, or a series slug when `season` and `episode` are given |
 
-* scrape ToonStream iframes
-* resolve player iframes
-* extract AS-CDN or RubyStream sources
-* optionally proxify the final URLs
+**Query parameters**
 
-Example shape:
+| Name | Required | Default | Description |
+| --- | --- | --- | --- |
+| `season` | No | none | Season number, `0` or more |
+| `episode` | No | none | Episode number, `0` or more |
+
+**Example**
+
+```bash
+curl "http://localhost:3000/anime/toonstream/episode/sources/grand-blue-dreaming?season=2&episode=1"
+```
 
 ```json
 {
   "success": true,
   "data": {
+    "hash": "d5b8786f4dea41ac9a605b5a068a8069",
     "embeds": [
-      "https://toonstream.../embed/ascdn/...",
-      "https://toonstream.../embed/rubystm/..."
+      "https://rubystm.com/e/p1adftjtf97n.html",
+      "https://filesforever.link/embed/ahbyz4u",
+      "https://vidmoly.net/embed-02zr8qio3qld.html",
+      "https://abyssplayer.com/iBblt37Oz",
+      "https://as-cdn26.top/video/d5b8786f4dea41ac9a605b5a068a8069",
+      "https://turbonewvid.com/t/6a0465c77f60d"
     ],
-    "sources": []
+    "sources": [
+      {
+        "label": "Ruby",
+        "type": "hls",
+        "url": "https://rap7c5roebejl0.streamruby.net/hls2/01/00469/p1adftjtf97n_,l,n,h,x,.urlset/master.m3u8?t=3h-ZRtWIhsO0kYl91ftSaGt3TZ-UMAQhETn2_f9n4Bk&s=1790686604&e=32400&v=1871250007&i=103.41&sp=0",
+        "cover": "https://img.streamruby.com//p1adftjtf97n_xt.jpg",
+        "thumbnail": "https://rap7c5roebejl0.streamruby.net/vtt/01/00469/p1adftjtf97n_sli.vtt",
+        "headers": {
+          "Origin": "https://rubystm.com",
+          "Referer": "https://rubystm.com/"
+        },
+        "proxiedUrl": "http://localhost:3000/proxy/m3u8-proxy?url=https%3A%2F%2Frap7c5roebejl0.streamruby.net%2Fhls2%2F01%2F00469%2Fp1adftjtf97n_%2Cl%2Cn%2Ch%2Cx%2C.urlset%2Fmaster.m3u8%3Ft%3D3h-ZRtWIhsO0kYl91ftSaGt3TZ-UMAQhETn2_f9n4Bk%26s%3D1790686604%26e%3D32400%26v%3D1871250007%26i%3D103.41%26sp%3D0&headers=%7B%22Origin%22%3A%22https%3A%2F%2Frubystm.com%22%2C%22Referer%22%3A%22https%3A%2F%2Frubystm.com%2F%22%7D"
+      }
+    ]
   }
 }
 ```
 
-**Caching**
+The same episode by its full slug:
 
-* cache key: `episode:iframes:{slug}`
+```bash
+curl "http://localhost:3000/anime/toonstream/episode/sources/grand-blue-dreaming-2x1"
+```
 
-### Media proxy routes
+### Source fields
 
-Some ToonStream sources require custom headers or a trusted origin.
+| Field | Description |
+| --- | --- |
+| `label` | The player the source came from: `Ruby`, `Multi Audio` (AS-CDN) or `Turbo` |
+| `type` | `hls` or `mp4` |
+| `url` | The direct stream. It needs `headers` to play |
+| `cover` | Poster image, when the player has one |
+| `thumbnail` | Seek-preview thumbnails (WebVTT), when available |
+| `subtitles` | One subtitle track, `{ "label", "url" }`, English when available. Omitted when there are none |
+| `headers` | Headers the host requires, such as `Origin` and `Referer` |
+| `proxiedUrl` | The stream through the API's [stream proxy](../../core/proxy.md) with `headers` attached. Use this in a browser player |
 
-These proxy routes help you serve those files through your own API.
+Only Ruby (rubystm, streamruby), AS-CDN and Turbo (emturbovid, turbovidhls, turboviplay) players are resolved. Other players, such as filesforever, vidmoly or abyssplayer, only appear in `embeds`. Ruby playlists usually carry several audio tracks (for example Hindi, Tamil, Telugu and English).
 
-Relevant environment variables:
+{% hint style="warning" %}
+On 2026-09-29 the AS-CDN host (`as-cdn26.top`) answered HTTP 523, so every source observed came from Ruby. The `Multi Audio` source shape above is taken from the source code.
+{% endhint %}
 
-* `SERVER_ORIGIN` required
-* `PROXIFY` optional
-* `ALLOWED_ORIGINS` optional
+## Errors
 
-Size limits:
+| Status | When |
+| --- | --- |
+| `200` with `success: false` | Unknown slug, or ToonStream failed or returned nothing usable (`"msg": "No Data Scraped!"`) |
+| `422` | `page` is not an integer of at least `1`, or `season` or `episode` is not a number of at least `0` |
 
-* m3u8: 5 MB
-* ts segments: 50 MB
-* generic fetch: 50 MB
-* mp4: 20 GB
+`422` bodies come from Elysia's validation, for example:
 
-If a file exceeds its limit, the proxy returns `413`.
+```json
+{
+  "type": "validation",
+  "on": "property",
+  "property": "root",
+  "message": "Expected number to be greater or equal to 1",
+  "summary": "Expected number to be greater or equal to 1",
+  "found": 0
+}
+```
 
-Most proxy routes accept:
+## Notes
 
-* `url` required
-* `headers` optional as encoded JSON
-
-#### M3U8 proxy
-
-`GET /anime/toonstream/m3u8-proxy?url={url}&headers={encodedHeaders}`
-
-Fetches an HLS playlist, rewrites media URLs to proxy routes, and returns the rewritten playlist.
-
-**Behavior**
-
-* rewrites nested playlists back to `m3u8-proxy`
-* rewrites TS media segments to `ts-segment`
-* rewrites other media references to `fetch`
-* resolves relative URLs against the original playlist URL
-* adds `Connection: keep-alive`
-
-Use this for HLS players that cannot reach the source directly.
-
-#### TS segment proxy
-
-`GET /anime/toonstream/ts-segment?url={url}&headers={encodedHeaders}`
-
-Proxies TS segments used by HLS playback.
-
-**Behavior**
-
-* forwards the raw upstream stream
-* preserves or defaults the content type
-* sets `Cache-Control: public, max-age=86400`
-* adds `Connection: keep-alive`
-
-#### MP4 proxy
-
-`GET /anime/toonstream/mp4-proxy?url={url}&headers={encodedHeaders}`
-
-Range-aware proxy for MP4 playback.
-
-**Behavior**
-
-* forwards the client `Range` header
-* preserves partial content responses
-* returns `accept-ranges: bytes`
-* keeps scrub and seek working in players
-
-#### Generic fetch proxy
-
-`GET /anime/toonstream/fetch?url={url}&headers={encodedHeaders}`
-
-Proxies other files like captions, keys, images, or auxiliary media.
-
-**Behavior**
-
-* forwards the upstream status and body
-* preserves the upstream content type when possible
-* defaults to `application/octet-stream`
-
-### Security notes
-
-`SERVER_ORIGIN` is required.
-
-The router throws at startup if it is missing.
-
-Proxy routes also:
-
-* abort upstream fetches when the client disconnects
-* enforce file size limits
-* trust caller-supplied target URLs and headers
-
-For production, add your own:
-
-* host allowlists
-* auth
-* rate limiting
-
-### Typical workflow
-
-1. Use `/anime/toonstream/home` for a home screen.
-2. Use `/anime/toonstream/search/:query/:page?` for search.
-3. Use `/anime/toonstream/movies/:page?` or `/anime/toonstream/series/:page?` for browsing.
-4. Use detail routes for metadata.
-5. Use source routes for playback URLs.
-6. Use proxy routes when the player needs safer access to upstream media.
-
-ToonStream is a good fit when you want both catalog browsing and proxy-backed playback inside one provider.
+* Typical flow: `search` or `home` → `movies/info/:slug` or `series/info/:slug` → `movies/sources/:slug` or `episode/sources/:slug` → play `proxiedUrl`.
+* When a player host fails with a 5xx error or times out, the API skips that host for 5 minutes. The first request that hits a down host can take several seconds (about 7 seconds in testing); later ones are fast.
+* With Redis enabled (`REDIS_URL`), results are cached: home, search and listings for 12 hours, movie info for 14 days, series info for 3 days, the list of embeds on a page for 1 day, and resolved sources for 2 hours (AS-CDN), 8 hours (Ruby) or 12 hours (Turbo). Requests that fail are not cached.
+* `tmdbRating` is a number; `year` is a string.
